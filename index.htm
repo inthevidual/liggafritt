@@ -49,7 +49,7 @@
     <link rel="preconnect" href="https://huggingface.co">
 
     <link rel="stylesheet" href="styles/brand.css?v=2f060107">
-    <link rel="stylesheet" href="styles/app.css?v=6be37a75">
+    <link rel="stylesheet" href="styles/app.css?v=3c646ad2">
 </head>
 <body>
 
@@ -121,7 +121,7 @@
                 </div>
 
                 <div class="canvas-frame" id="canvasFrame" data-ground="checker">
-                    <canvas id="previewCanvas" role="img" aria-label="Frilagd bild"></canvas>
+                    <canvas id="previewCanvas" role="img" aria-label="Frilagd bild" title="Dra för att placera bylineutsnittet, rulla för att zooma"></canvas>
                 </div>
 
                 <div class="ground-row">
@@ -154,6 +154,10 @@
                             <button type="button" class="segmented__option is-active" data-viewport="desktop" aria-pressed="true">Desktop</button>
                             <button type="button" class="segmented__option" data-viewport="mobile" aria-pressed="false">Mobil</button>
                         </div>
+                        <div class="segmented" role="group" aria-label="Läge">
+                            <button type="button" class="segmented__option is-active" data-scheme="light" aria-pressed="true">Ljust</button>
+                            <button type="button" class="segmented__option" data-scheme="dark" aria-pressed="false">Mörkt</button>
+                        </div>
                     </div>
                 </div>
 
@@ -162,9 +166,13 @@
                      cut-out right-aligned and bled to the rule that closes the
                      block. Deliberately unbranded — it shows placement, it is not
                      a reproduction of anyone's front page. -->
-                <div class="artikel" id="artikelPreview" data-viewport="desktop">
+                <div class="artikel" id="artikelPreview" data-viewport="desktop" data-scheme="light">
                     <div class="artikel__block">
-                        <p class="artikel__tags"><span>Krönika</span><span>Valet 2026</span></p>
+                        <p class="artikel__tags">
+                            <span class="artikel__tag artikel__tag--section">Krönika</span>
+                            <span class="artikel__sep" aria-hidden="true">|</span>
+                            <span class="artikel__tag">Valet 2026</span>
+                        </p>
                         <h1 class="artikel__h1">
                             <span class="artikel__author" id="previewAuthor">Mållgan Johansson:</span>
                             <span class="artikel__title" id="previewHeadline">Ted Cruz är en fi-fi-finfin kille.</span>
@@ -291,6 +299,6 @@
     </script>
 
     <script src="vendor/utif.js?v=e3e76115"></script>
-    <script type="module" src="script.js?v=87cf6718"></script>
+    <script type="module" src="script.js?v=b71f0643"></script>
 </body>
 </html>

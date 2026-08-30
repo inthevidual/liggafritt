@@ -185,7 +185,7 @@ class LiggaFritt {
         window.addEventListener('resize', () => {
             if (!this.cutout) return;
             this.sizeBylineCanvas();
-            this.paintByline();
+            this.paintFraming();
         });
 
         this.downloadBtn.addEventListener('click', () => this.download());
@@ -429,33 +429,8 @@ class LiggaFritt {
         const frame = this.bylineFrame;
         if (!frame) return;
 
-        frame.addEventListener('pointerdown', (e) => {
-            if (!this.cutout) return;
-            frame.setPointerCapture(e.pointerId);
-            this.drag = { x: e.clientX, y: e.clientY, ox: this.byline.offsetX, oy: this.byline.offsetY };
-        });
-
-        frame.addEventListener('pointermove', (e) => {
-            if (!this.drag) return;
-            const dpr = this.bylineCanvas.width / frame.clientWidth;
-            this.byline.offsetX = this.drag.ox + (e.clientX - this.drag.x) * dpr;
-            this.byline.offsetY = this.drag.oy + (e.clientY - this.drag.y) * dpr;
-            this.paintByline();
-        });
-
-        const end = (e) => {
-            if (!this.drag) return;
-            this.drag = null;
-            frame.releasePointerCapture?.(e.pointerId);
-        };
-        frame.addEventListener('pointerup', end);
-        frame.addEventListener('pointercancel', end);
-
-        frame.addEventListener('wheel', (e) => {
-            if (!this.cutout) return;
-            e.preventDefault();
-            this.zoomBylineAt(Math.exp(-e.deltaY * 0.0015), e);
-        }, { passive: false });
+        // Inside the byline frame one frame-pixel is one frame-pixel.
+        this.bindFraming(frame, () => 1, (e) => this.anchorInFrame(e));
 
         this.bylineZoom.addEventListener('input', (e) => {
             this.setBylineScale(parseFloat(e.target.value));
@@ -465,6 +440,15 @@ class LiggaFritt {
             if (btn.tagName !== 'BUTTON') return;
             btn.addEventListener('click', () => this.setViewport(btn.dataset.viewport));
         });
+
+        document.querySelectorAll('[data-scheme]').forEach((btn) => {
+            if (btn.tagName !== 'BUTTON') return;
+            btn.addEventListener('click', () => this.setScheme(btn.dataset.scheme));
+        });
+
+        // The big preview is the same framing at working size: dragging either
+        // moves the same crop, so the article header updates as you work.
+        this.bindFraming(this.canvas, () => this.previewScale(), (e) => this.anchorInPreview(e));
 
         const author = document.getElementById('authorInput');
         const headline = document.getElementById('headlineInput');
@@ -482,6 +466,98 @@ class LiggaFritt {
         document.getElementById('bylineDownloadBtn').addEventListener('click', () => this.downloadByline());
     }
 
+    /**
+     * Make a surface frame the cut-out. Both the byline frame and the big
+     * preview drive the same transform, so a drag in either lands in both; they
+     * differ only in how many frame-pixels one surface-pixel is worth, which is
+     * what `ratio` returns.
+     */
+    bindFraming(el, ratio, anchor) {
+        el.addEventListener('pointerdown', (e) => {
+            if (!this.cutout) return;
+            el.setPointerCapture(e.pointerId);
+            this.drag = { x: e.clientX, y: e.clientY, ox: this.byline.offsetX, oy: this.byline.offsetY };
+        });
+
+        el.addEventListener('pointermove', (e) => {
+            if (!this.drag) return;
+            const k = ratio();
+            this.byline.offsetX = this.drag.ox + (e.clientX - this.drag.x) * k;
+            this.byline.offsetY = this.drag.oy + (e.clientY - this.drag.y) * k;
+            this.paintFraming();
+        });
+
+        const end = (e) => {
+            if (!this.drag) return;
+            this.drag = null;
+            el.releasePointerCapture?.(e.pointerId);
+        };
+        el.addEventListener('pointerup', end);
+        el.addEventListener('pointercancel', end);
+
+        el.addEventListener('wheel', (e) => {
+            if (!this.cutout) return;
+            e.preventDefault();
+            this.setBylineScale(this.byline.scale * Math.exp(-e.deltaY * 0.0015), anchor(e));
+        }, { passive: false });
+    }
+
+    /**
+     * One big-preview pixel in byline-frame pixels. The big preview shows the
+     * whole cut-out letterboxed; the byline frame shows a window onto it at its
+     * own scale, so the two differ by the ratio of those scales.
+     */
+    previewScale() {
+        const fit = this.previewFit();
+        const k = (this.byline.base || 1) * this.byline.scale;
+        const css = this.canvas.getBoundingClientRect().width / this.canvas.width;
+        return k / (fit.scale * css);
+    }
+
+    /** A pointer event over the byline frame, in frame pixels. */
+    anchorInFrame(e) {
+        const r = this.bylineFrame.getBoundingClientRect();
+        const dpr = this.bylineCanvas.width / r.width;
+        return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr };
+    }
+
+    /** A pointer event over the big preview, mapped into frame pixels. */
+    anchorInPreview(e) {
+        const r = this.canvas.getBoundingClientRect();
+        const fit = this.previewFit();
+        const css = r.width / this.canvas.width;
+        const k = (this.byline.base || 1) * this.byline.scale;
+        const ix = ((e.clientX - r.left) / css - fit.x) / fit.scale;
+        const iy = ((e.clientY - r.top) / css - fit.y) / fit.scale;
+        return { x: ix * k + this.byline.offsetX, y: iy * k + this.byline.offsetY };
+    }
+
+    /** Letterbox geometry for the cut-out inside the big preview canvas. */
+    previewFit() {
+        const c = this.canvas;
+        const scale = Math.min(c.width / this.cutout.width, c.height / this.cutout.height);
+        return {
+            scale,
+            x: (c.width - this.cutout.width * scale) / 2,
+            y: (c.height - this.cutout.height * scale) / 2,
+        };
+    }
+
+    paintFraming() {
+        this.paintByline();
+        this.paint();
+    }
+
+    setScheme(which) {
+        document.getElementById('artikelPreview').dataset.scheme = which;
+        document.querySelectorAll('[data-scheme]').forEach((btn) => {
+            if (btn.tagName !== 'BUTTON') return;
+            const active = btn.dataset.scheme === which;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        });
+    }
+
     setViewport(which) {
         document.getElementById('artikelPreview').dataset.viewport = which;
         document.querySelectorAll('[data-viewport]').forEach((btn) => {
@@ -492,7 +568,7 @@ class LiggaFritt {
         });
         // The frame's aspect changes between the two, so re-fit the backing store.
         this.sizeBylineCanvas();
-        this.paintByline();
+        this.paintFraming();
     }
 
     /** Match the backing store to the frame's CSS box, at 4x for a crisp export. */
@@ -526,7 +602,7 @@ class LiggaFritt {
         this.byline.offsetY = at.y - (at.y - this.byline.offsetY) * k;
         this.byline.scale = next;
         this.bylineZoom.value = next;
-        this.paintByline();
+        this.paintFraming();
     }
 
     zoomBylineAt(factor, event) {
@@ -575,7 +651,7 @@ class LiggaFritt {
         this.byline.offsetY = frame.h - (b.y + b.height) * base;
 
         this.bylineZoom.value = 1;
-        this.paintByline();
+        this.paintFraming();
     }
 
     paintByline() {
@@ -650,9 +726,43 @@ class LiggaFritt {
 
         if (this.view === 'original' || !this.cutout) {
             this.ctx.drawImage(this.source.bitmap, 0, 0);
-        } else {
-            this.ctx.putImageData(this.cutout, 0, 0);
+            return;
         }
+
+        this.ctx.putImageData(this.cutout, 0, 0);
+        this.drawCropOutline();
+    }
+
+    /**
+     * Show where the byline frame currently sits, so the big preview is not
+     * just a bigger picture but the same framing decision at working size.
+     */
+    drawCropOutline() {
+        if (!this.byline.base || this.bylineCanvas.width === 0) return;
+        const ctx = this.ctx;
+        const k = this.byline.base * this.byline.scale;
+
+        // The frame, expressed in the cut-out's own pixels.
+        const x = -this.byline.offsetX / k;
+        const y = -this.byline.offsetY / k;
+        const w = this.bylineCanvas.width / k;
+        const h = this.bylineCanvas.height / k;
+
+        const line = Math.max(2, this.canvas.width / 260);
+        ctx.save();
+        // Dim what falls outside it rather than drawing a bare rectangle — the
+        // subject is often light, and a thin line on it is easy to lose.
+        ctx.fillStyle = 'rgba(3, 20, 32, 0.34)';
+        ctx.beginPath();
+        ctx.rect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.rect(x, y, w, h);
+        ctx.fill('evenodd');
+
+        ctx.strokeStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--color-focus').trim() || '#0098DA';
+        ctx.lineWidth = line;
+        ctx.strokeRect(x, y, w, h);
+        ctx.restore();
     }
 
     async download() {

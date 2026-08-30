@@ -340,31 +340,48 @@
 }
 
 /* ── Article-header preview ───────────────────────────────────────────────────
-   A preview of where the cut-out lands: dark block, tag row, an H1 whose first
-   span is the writer's name as a colon prefix, and the portrait right-aligned
-   and bled to the rule that closes the block.
+   Measured off the live article rather than guessed: the H1 is Sueca Hd at the
+   light weight, 42/46px with no tracking; the writer's name is a colon prefix
+   in #C3C2C1 (the same grey in both schemes); the section tag is Ester Blenda
+   700 in the action blue; and the portrait is a square box, bottom-flush with
+   the 1px rule that closes the block, overflow hidden so the figure is cropped
+   by it.
 
-   This is the one place that uses raw ramps rather than semantic tokens. It is
-   deliberate: the block is simulating a fixed dark article header, so it must
-   stay dark whichever theme the tool itself is in. Everywhere else, §2.1 holds.
+   This is the one place that uses fixed colours rather than semantic tokens.
+   Deliberate: it reproduces the article's own light and dark schemes, which do
+   not follow this tool's theme. Everywhere else, §2.1 holds.
    ------------------------------------------------------------------------- */
 
 .artikel {
   border: 1px solid var(--color-border-primary);
   border-radius: var(--radius-md);
   overflow: hidden;
-  /* Roughly the article column at desktop width — letting the block run the
-     full width of the card makes the headline look stranded. */
   max-width: 900px;
+}
+
+/* SvD's own two schemes. Dark is #0B2337 — the same navy as --blue-700. */
+.artikel[data-scheme='light'] {
+  --a-bg: #FFFFFF;
+  --a-title: #1D1D1B;
+  --a-tag: #0D4C80;
+  --a-rule: #F2EFEE;
+  --a-caption: #605E5D;
+}
+
+.artikel[data-scheme='dark'] {
+  --a-bg: #0B2337;
+  --a-title: #F7F6F5;
+  --a-tag: #42C0F0;
+  --a-rule: rgba(255, 255, 255, 0.16);
+  --a-caption: #B9C7D4;
 }
 
 .artikel__block {
   position: relative;
-  background: var(--blue-800);
-  padding: 20px 24px 0;
-  /* The rule that closes the block, and crops the portrait. */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  min-height: 190px;
+  background: var(--a-bg);
+  padding: 22px 28px 0;
+  border-bottom: 1px solid var(--a-rule);
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -372,37 +389,42 @@
 
 .artikel__tags {
   display: flex;
-  gap: 14px;
-  margin: 0 0 14px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--blue-200);
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 22px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--a-title);
 }
 
+.artikel__tag { font-weight: 600; }
+.artikel__tag--section { font-weight: 700; color: var(--a-tag); }
+.artikel__sep { color: var(--a-rule); font-weight: 400; }
+
+/* Sueca Hd light — weight 300 here reaches the same woff2 the article loads. */
 .artikel__h1 {
   position: relative;
   z-index: 1;
-  margin: 0 0 18px;
-  max-width: 62%;
+  margin: 0 0 22px;
+  max-width: 60%;
   font-family: var(--font-head);
-  font-weight: 600;
-  font-size: 30px;
-  line-height: 1.12;
-  letter-spacing: -0.02em;
+  font-weight: 300;
+  font-size: 34px;
+  line-height: 1.095;
+  letter-spacing: normal;
 }
 
-/* The name is part of the headline, set back in grey; the title carries. */
-.artikel__author { color: #8FA3B4; display: block; }
-.artikel__title { color: #FFFFFF; }
+.artikel__author { color: #C3C2C1; display: block; }
+.artikel__title { color: var(--a-title); }
 
-/* Bottom-anchored so the figure exits through the rule rather than floating. */
+/* Bottom-anchored and clipped, so the figure exits through the rule rather
+   than floating above it. */
 .artikel__portrait {
   position: absolute;
-  right: 24px;
+  right: 28px;
   bottom: 0;
-  width: 150px;
-  height: 175px;
+  width: 168px;
+  height: 190px;
   cursor: grab;
   touch-action: none;
   overflow: hidden;
@@ -413,28 +435,32 @@
 
 .artikel__caption {
   margin: 0;
-  padding: 10px 24px 14px;
-  background: var(--color-background-primary);
+  padding: 12px 28px 16px;
+  background: var(--a-bg);
+  border-top: 0;
   font-family: var(--font-ui);
   font-size: 12px;
   line-height: 1.45;
-  color: var(--color-text-muted);
+  color: var(--a-caption);
 }
 
-/* Mobile: narrower column so the headline wraps to three lines, smaller
-   portrait, still bottom-cropped by the rule. */
 .artikel[data-viewport='mobile'] { max-width: 375px; }
-.artikel[data-viewport='mobile'] .artikel__block { padding: 16px 16px 0; min-height: 210px; }
-.artikel[data-viewport='mobile'] .artikel__h1 { font-size: 24px; max-width: 58%; }
-.artikel[data-viewport='mobile'] .artikel__portrait { right: 16px; width: 118px; height: 138px; }
+.artikel[data-viewport='mobile'] .artikel__block { padding: 16px 16px 0; min-height: 215px; }
+.artikel[data-viewport='mobile'] .artikel__h1 { font-size: 26px; max-width: 56%; }
+.artikel[data-viewport='mobile'] .artikel__tags { font-size: 13px; margin-bottom: 16px; }
+.artikel[data-viewport='mobile'] .artikel__portrait { right: 16px; width: 128px; height: 146px; }
 .artikel[data-viewport='mobile'] .artikel__caption { padding: 10px 16px 14px; }
 
 @media (max-width: 599px) {
   .artikel__block { padding: 16px 16px 0; }
-  .artikel__h1 { font-size: 24px; max-width: 58%; }
-  .artikel__portrait { right: 16px; width: 118px; height: 138px; }
+  .artikel__h1 { font-size: 26px; max-width: 56%; }
+  .artikel__portrait { right: 16px; width: 128px; height: 146px; }
   .artikel__caption { padding: 10px 16px 14px; }
 }
+
+/* The big preview is the same framing at working size, so it drags too. */
+#previewCanvas { cursor: grab; touch-action: none; }
+#previewCanvas:active { cursor: grabbing; }
 
 /* ── Byline fields ────────────────────────────────────────────────────────── */
 

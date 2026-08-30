@@ -87,16 +87,29 @@ och inte nödvändigt för det här verktyget.
 
 Verktygets huvudsakliga användning är porträttet i ett artikelhuvud, så
 resultatet går att placera: dra i bilden, rulla för att zooma, eller använd
-reglaget. Förhandsvisningen speglar hur huvudet är byggt —
+reglaget. **Stora förhandsvisningen och artikelhuvudet delar samma utsnitt** —
+drar man i den ena flyttas den andra. Den stora visar var utsnittet ligger med
+en ram och dämpad omgivning; artikelhuvudet visar hur det faktiskt ser ut.
 
-- taggrad, sedan en `<h1>` vars **första span är skribentens namn som ett
-  kolonprefix**, satt tillbaka i grått, följt av rubriken i vitt;
-- porträttet högerställt i det mörka blocket och **beskuret av strecket som
-  avslutar blocket**, inte en rund avatar;
-- bildtext med fotobyline inline efter `Foto:`, aldrig som egen högerställd rad.
+### Mätt, inte gissat
 
-Desktop och mobil går att växla mellan, eftersom rubriken bryts olika och
-porträttet är mindre i den smala spalten.
+Layouten är avläst från den riktiga artikeln med Playwright, inte antagen:
+
+| | |
+|---|---|
+| Rubrik | Sueca Hd i **light**, 42/46 px, ingen negativ knipning |
+| Skribentnamn | samma rubrik, som kolonprefix i `#C3C2C1` — **samma grå i båda lägena** |
+| Taggrad | SvD Ester Blenda 700, sektionen i aktionsblått |
+| Ljust läge | botten `#FFFFFF`, rubrik `#1D1D1B`, tagg `#0D4C80`, linje `#F2EFEE` |
+| Mörkt läge | botten `#0B2337`, rubrik `#F7F6F5`, tagg `#42C0F0` |
+| Porträtt | kvadratisk ruta, `overflow: hidden`, bottenlinjerad mot strecket |
+
+Mörkt läge använder alltså `#0B2337` — exakt samma marin som `--blue-700` i
+designsystemet. Och artikeln laddar precis de woff2-filer som ligger i `fonts/`,
+vilket bekräftar att designsystemets typsnitt är produktionstypsnitten.
+
+Både ljust och mörkt går att växla mellan, liksom desktop och mobil, eftersom
+rubriken bryts olika och porträttet är mindre i den smala spalten.
 
 Startläget fyller ramens bredd med motivet och ställer det på nederkanten, så
 figuren går ut genom strecket i stället för att sväva. Bylinen sparas som PNG
