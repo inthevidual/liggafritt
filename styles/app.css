@@ -326,24 +326,6 @@
 .site-footer p { margin: 0; }
 .footer-meta { margin-top: 6px; }
 
-/* ── Setting row ──────────────────────────────────────────────────────────── */
-
-.setting-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 12px;
-}
-
-.setting-row .label { display: inline; }
-
-.segmented__option:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.segmented__option:disabled:hover { color: var(--color-text-secondary); }
 
 .drop-zone__name {
   display: none;
@@ -352,3 +334,7 @@
 }
 
 .drop-zone.loaded .drop-zone__name { display: inline; }
+
+.facts__note {
+  color: var(--color-text-muted);
+}

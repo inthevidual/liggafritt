@@ -84,15 +84,24 @@ function classifyFills(svg) {
   const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
   // Fold each colour into the most common one it is indistinguishable from.
-  const canon = {};
+  //
+  // Compare only against colours that are themselves canonical. Matching against
+  // every key instead lets merges chain — A absorbs B, then C matches B and is
+  // redirected to A, which it may be nowhere near. On artwork with a handful of
+  // flat colours that never shows; on this one, with 900-odd shades, it produced
+  // shifts of ΔE 6 and worse. Every colour now lands within the threshold of the
+  // colour it actually becomes.
+  const canonicals = [];
   const merged = [];
   for (const [colour] of ranked) {
-    const hit = Object.keys(canon).find((c) => deltaE(c, colour) < 2);
-    if (hit) { canon[colour] = canon[hit]; merged.push([colour, canon[hit]]); }
-    else canon[colour] = colour;
+    const hit = canonicals.find((c) => deltaE(c, colour) < MERGE_THRESHOLD);
+    if (hit) merged.push([colour, hit]);
+    else canonicals.push(colour);
   }
   for (const [from, to] of merged) svg = svg.replaceAll(`fill="${from}"`, `fill="${to}"`);
-  merged.forEach(([from, to]) => console.log(`  merged ${from} -> ${to} (ΔE ${deltaE(from, to).toFixed(2)})`));
+
+  const worst = merged.reduce((m, [f, t]) => Math.max(m, deltaE(f, t)), 0);
+  console.log(`  merged ${merged.length} colours, worst shift ΔE ${worst.toFixed(2)} (threshold ${MERGE_THRESHOLD})`);
 
   const finals = {};
   for (const m of svg.matchAll(/fill="(#[0-9a-fA-F]{6})"/g)) finals[m[1]] = (finals[m[1]] || 0) + 1;
@@ -105,6 +114,8 @@ function classifyFills(svg) {
   console.log(`  palette ${ranked.length} -> ${order.length} colours`);
   return svg.replace(/(<svg[^>]*>)/, `$1<style>${css}</style>`);
 }
+
+const MERGE_THRESHOLD = 2;
 
 const kb = (f) => `${(fs.statSync(f).size / 1024).toFixed(1)} KB`;
 

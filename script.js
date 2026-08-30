@@ -21,43 +21,40 @@ import {
 env.allowLocalModels = false;
 
 /**
- * Two BiRefNet checkpoints, both MIT, both descended from ZhengPeng7/BiRefNet.
+ * One model, and the reasons for that are measured rather than assumed.
  *
- * The choice is forced by how they were exported: the ONNX graphs have *static*
- * input shapes, so the resolution cannot be turned down at runtime. Measured
- * here: the 1024 export dies on the WASM backend with std::bad_alloc — its
- * activations exceed the WASM heap — while the 512 export finishes in about
- * five seconds on the same machine. So 512 is the default, and 1024 is offered
- * only where WebGPU can carry it.
+ * BiRefNet's ONNX graphs carry *static* input shapes, so resolution cannot be
+ * turned down at runtime — it has to be chosen as a checkpoint. The 1024 export
+ * has no working configuration in a browser: on WASM it dies with
+ * std::bad_alloc, its activations exceeding the heap, and on WebGPU it hits the
+ * shader limit below. So 512 it is, which finishes in about five seconds.
  *
- * The portrait-tuned checkpoint is better still on flyaway hair, but it is
- * 467 MB in fp16 against 94 MB here, which is not a reasonable default for a
- * tool people open once.
+ * The portrait-tuned checkpoint is better on flyaway hair but is 467 MB in fp16
+ * against 94 MB here, which is not a reasonable ask for a tool opened once.
  */
-const MODELS = {
-    standard: {
-        id: 'studioludens/birefnet-lite-512',
-        name: 'BiRefNet lite, 512',
-        licence: 'MIT',
-        resolution: 512,
-        needsWebGPU: false,
-        size: { fp16: 94, fp32: 183 },
-    },
-    detail: {
-        id: 'onnx-community/BiRefNet_lite-ONNX',
-        name: 'BiRefNet lite, 1024',
-        licence: 'MIT',
-        resolution: 1024,
-        needsWebGPU: true,
-        size: { fp16: 109, fp32: 214 },
-    },
+const MODEL = {
+    id: 'studioludens/birefnet-lite-512',
+    name: 'BiRefNet lite, 512',
+    licence: 'MIT',
+    resolution: 512,
+    size: { fp16: 94, fp32: 183 },
 };
 
-// Where WebGPU can carry it, 1024 is the better default: it is only 15 MB more
-// to download than 512 in fp16, and the extra resolution is exactly what hair
-// needs. Without WebGPU it cannot run at all, so 512 it is.
-const defaultQuality = (webgpu) => (webgpu ? 'detail' : 'standard');
-const QUALITY_KEY = 'lf.quality';
+/**
+ * BiRefNet's compute shader binds 11 storage buffers. WebGPU devices advertise
+ * a ceiling for that, and Chrome on Apple Silicon reports 10 — one short — so
+ * the run aborts inside ONNX Runtime with
+ *
+ *   numbers_storage_buffers_ <= limits_.maxStorageBuffersPerShaderStage
+ *   Too many storage buffers in shader. Current: 11, Max is 10
+ *
+ * The adapter publishes that number, so it is checkable before anything is
+ * downloaded or run. Machines that cannot carry the shader quietly use WASM
+ * instead of failing halfway through.
+ */
+const STORAGE_BUFFERS_NEEDED = 11;
+
+const WASM_ONLY_KEY = 'lf.wasmOnly';
 
 const ACCEPTED = /\.(jpe?g|png|tiff?|avif)$/i;
 const MAX_PIXELS = 40e6; // ~40 MP, above which decoding is the bottleneck, not the model
@@ -80,85 +77,55 @@ class LiggaFritt {
         this.resetBtn = document.getElementById('resetBtn');
         this.factModel = document.getElementById('factModel');
         this.factDevice = document.getElementById('factDevice');
-        this.qualityNote = document.getElementById('qualityNote');
+        this.deviceNote = document.getElementById('deviceNote');
 
         this.source = null;   // { bitmap, width, height, name }
         this.cutout = null;   // ImageData with the matte applied
         this.view = 'cutout';
-        this.models = new Map(); // quality -> promise of { model, processor }
+        this.modelPromise = null;
         this.device = null;
-        this.forceWasm = false;  // set once WebGPU has proved itself unusable
         this.busy = false;
 
-        // An explicit choice outlives the default; otherwise the device decides.
-        try { this.saved = localStorage.getItem(QUALITY_KEY); } catch { this.saved = null; }
-        this.quality = 'standard';
+        // Set once WebGPU has proved unusable here, so the next visit does not
+        // repeat a failure the user has already sat through.
+        try { this.wasmOnly = localStorage.getItem(WASM_ONLY_KEY) === '1'; } catch { this.wasmOnly = false; }
 
         this.bindEvents();
-        this.detectDevice().then(() => {
-            this.quality = MODELS[this.saved] ? this.saved : defaultQuality(this.webgpu);
-            this.syncQuality();
-        });
+        this.detectDevice();
     }
-
-    get model() { return MODELS[this.quality]; }
 
     /* ── Capability ─────────────────────────────────────────────────────── */
 
-    async detectDevice() {
-        // navigator.gpu existing is not enough — an adapter request can still
-        // fail on a blocklisted driver, and then WASM is the honest answer.
-        let webgpu = false;
-        if (navigator.gpu && !this.forceWasm) {
-            try { webgpu = Boolean(await navigator.gpu.requestAdapter()); } catch { webgpu = false; }
-        }
-        this.device = webgpu ? 'webgpu' : 'wasm';
-        this.webgpu = webgpu;
-        this.factDevice.textContent = webgpu
-            ? 'WebGPU — några sekunder per bild'
-            : 'WASM (ingen WebGPU) — några sekunder per bild i standardläge';
-    }
-
     /**
-     * The 1024 model needs WebGPU: on WASM its activations blow past the heap
-     * and ONNX Runtime aborts. Rather than let someone pick a setting that
-     * cannot work, disable it and say why.
+     * Pick the backend up front, and only claim WebGPU when the adapter can
+     * actually carry this model's shader. An adapter existing is not enough:
+     * the request can fail on a blocklisted driver, and even a healthy adapter
+     * may publish a storage-buffer ceiling below what BiRefNet binds.
      */
-    syncQuality() {
-        const dtype = this.device === 'webgpu' ? 'fp16' : 'fp32';
-
-        document.querySelectorAll('[data-quality]').forEach((btn) => {
-            const key = btn.dataset.quality;
-            const def = MODELS[key];
-            const blocked = def.needsWebGPU && !this.webgpu;
-
-            btn.disabled = blocked;
-            btn.title = blocked ? 'Kräver WebGPU' : `${def.size[dtype]} MB nedladdning`;
-            const active = key === this.quality;
-            btn.classList.toggle('is-active', active);
-            btn.setAttribute('aria-pressed', String(active));
-        });
-
-        if (this.model.needsWebGPU && !this.webgpu) {
-            this.quality = 'standard';
-            return this.syncQuality();
+    async detectDevice() {
+        let adapter = null;
+        if (navigator.gpu && !this.wasmOnly) {
+            try { adapter = await navigator.gpu.requestAdapter(); } catch { adapter = null; }
         }
 
-        this.factModel.textContent =
-            `${this.model.name} (${this.model.licence}) — ${this.model.size[dtype]} MB`;
-        this.qualityNote.textContent = this.webgpu
-            ? ''
-            : 'Hög detalj kräver WebGPU, som den här webbläsaren saknar.';
-        return undefined;
-    }
+        const buffers = adapter?.limits?.maxStorageBuffersPerShaderStage ?? 0;
+        const enough = buffers >= STORAGE_BUFFERS_NEEDED;
+        this.device = adapter && enough ? 'webgpu' : 'wasm';
 
-    setQuality(quality) {
-        if (!MODELS[quality] || quality === this.quality || this.busy) return;
-        this.quality = quality;
-        try { localStorage.setItem(QUALITY_KEY, quality); } catch { /* private mode */ }
-        this.syncQuality();
-        // A different model means a different matte, so redo the current image.
-        if (this.source) this.run();
+        const dtype = this.device === 'webgpu' ? 'fp16' : 'fp32';
+        this.factModel.textContent = `${MODEL.name} (${MODEL.licence}) — ${MODEL.size[dtype]} MB`;
+
+        if (this.device === 'webgpu') {
+            this.factDevice.textContent = 'WebGPU — någon sekund per bild';
+            this.deviceNote.textContent = '';
+            return;
+        }
+
+        this.factDevice.textContent = 'WASM — några sekunder per bild';
+        this.deviceNote.textContent =
+            this.wasmOnly ? 'WebGPU gav fel här tidigare och används inte längre.'
+            : !adapter ? 'Ingen WebGPU i den här webbläsaren.'
+            : `Grafikkortet klarar ${buffers} lagringsbuffertar per shader, modellen behöver ${STORAGE_BUFFERS_NEEDED}.`;
     }
 
     /* ── Events ─────────────────────────────────────────────────────────── */
@@ -196,10 +163,6 @@ class LiggaFritt {
         document.querySelectorAll('[data-ground]').forEach((btn) => {
             if (btn.tagName !== 'BUTTON') return;
             btn.addEventListener('click', () => this.setGround(btn.dataset.ground));
-        });
-
-        document.querySelectorAll('[data-quality]').forEach((btn) => {
-            btn.addEventListener('click', () => this.setQuality(btn.dataset.quality));
         });
 
         this.downloadBtn.addEventListener('click', () => this.download());
@@ -305,10 +268,7 @@ class LiggaFritt {
     /* ── Model ──────────────────────────────────────────────────────────── */
 
     loadModel() {
-        const quality = this.quality;
-        if (this.models.has(quality)) return this.models.get(quality);
-
-        const def = MODELS[quality];
+        if (this.modelPromise) return this.modelPromise;
 
         // Per-file download fractions, combined into one bar — transformers.js
         // reports each shard separately and a bar that restarts looks broken.
@@ -330,18 +290,17 @@ class LiggaFritt {
         // backend gets fp32 rather than a matte full of NaNs.
         const dtype = this.device === 'webgpu' ? 'fp16' : 'fp32';
 
-        const promise = (async () => {
+        this.modelPromise = (async () => {
             const [model, processor] = await Promise.all([
-                AutoModel.from_pretrained(def.id, { dtype, device: this.device, progress_callback: onProgress }),
-                AutoProcessor.from_pretrained(def.id, { progress_callback: onProgress }),
+                AutoModel.from_pretrained(MODEL.id, { dtype, device: this.device, progress_callback: onProgress }),
+                AutoProcessor.from_pretrained(MODEL.id, { progress_callback: onProgress }),
             ]);
             return { model, processor };
         })();
 
         // Let a failed load be retried rather than cached as broken.
-        promise.catch(() => this.models.delete(quality));
-        this.models.set(quality, promise);
-        return promise;
+        this.modelPromise.catch(() => { this.modelPromise = null; });
+        return this.modelPromise;
     }
 
     mb(bytes) {
@@ -361,14 +320,14 @@ class LiggaFritt {
             ({ model, processor } = await this.loadModel());
         } catch (err) {
             console.error(err);
-            if (await this.retryInSafeMode('Modellen kunde inte laddas')) return;
+            if (await this.retryOnWasm('Modellen kunde inte laddas på grafikkortet')) return;
             this.fail('Modellen kunde inte laddas',
                 'Kontrollera nätverket och försök igen. Inget har skickats någonstans.');
             return;
         }
 
         this.setProgress(null);
-        this.setStatus('Frilägger', `${width}×${height} px — modellen arbetar i ${this.model.resolution}×${this.model.resolution}`);
+        this.setStatus('Frilägger', `${width}×${height} px — modellen arbetar i ${MODEL.resolution}×${MODEL.resolution}`);
 
         try {
             const started = performance.now();
@@ -389,32 +348,27 @@ class LiggaFritt {
             this.showResult(seconds);
         } catch (err) {
             console.error(err);
-            if (await this.retryInSafeMode('Beräkningen misslyckades')) return;
+            if (await this.retryOnWasm('Beräkningen misslyckades på grafikkortet')) return;
             this.fail('Friläggningen misslyckades', String(err?.message || err));
         }
     }
 
     /**
-     * Step down to the configuration that is known to work anywhere — 512 on
-     * WASM — and say so, rather than presenting a dead end.
-     *
-     * Two different things can go wrong and neither is knowable in advance: a
-     * GPU may not hand over enough memory for 1024, or WebGPU may report an
-     * adapter and still fail to produce a working device on a bad driver. The
-     * second is why this drops the *device* as well as the model; falling back
-     * to a smaller model on a broken GPU would just fail again.
+     * The adapter check above should keep us off a GPU that cannot run this
+     * model, but it only covers the one limit we know about — a driver can
+     * still fail in ways nothing advertises. So a WebGPU failure drops to WASM,
+     * remembers that for next time, and retries, rather than presenting a dead
+     * end. WASM is the floor: if that fails there is nowhere further to go.
      */
-    async retryInSafeMode(reason) {
-        if (this.forceWasm && this.quality === 'standard') return false;
+    async retryOnWasm(reason) {
+        if (this.device !== 'webgpu') return false;
 
-        this.forceWasm = true;
-        this.quality = 'standard';
-        this.models.clear();
-        try { localStorage.setItem(QUALITY_KEY, 'standard'); } catch { /* private mode */ }
+        this.wasmOnly = true;
+        this.modelPromise = null;
+        try { localStorage.setItem(WASM_ONLY_KEY, '1'); } catch { /* private mode */ }
 
         await this.detectDevice();
-        this.syncQuality();
-        this.setStatus('Byter till standardläge', `${reason} — kör om i 512×512 utan grafikacceleration.`);
+        this.setStatus('Byter till WASM', `${reason} — kör om utan grafikacceleration.`);
         await this.run();
         return true;
     }

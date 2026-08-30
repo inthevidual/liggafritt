@@ -18,48 +18,54 @@ Till skillnad från The Banfinator är sidan alltså *inte* fri från
 tredjepartstrafik: biblioteket hämtas från jsDelivr och modellvikterna från
 Hugging Face. Båda hämtas en gång och ligger sedan i webbläsarens cache.
 
-## De två lägena, och varför de finns
+## Modell och beräkning
 
-ONNX-graferna har **statiska** indatamått. Upplösningen går alltså inte att
-skruva ner i efterhand — den är inbakad i exporten. Det tvingar fram två
-checkpoints i stället för en:
+| | |
+|---|---|
+| Modell | [`studioludens/birefnet-lite-512`](https://huggingface.co/studioludens/birefnet-lite-512) |
+| Upplösning | 512×512, sedan uppskalad matta |
+| Nedladdning | 94 MB (fp16, WebGPU) / 183 MB (fp32, WASM) |
+| Licens | MIT |
 
-| Läge | Modell | Upplösning | fp16 / fp32 | Krav |
-|---|---|---|---|---|
-| Standard | [`studioludens/birefnet-lite-512`](https://huggingface.co/studioludens/birefnet-lite-512) | 512×512 | 94 / 183 MB | inget |
-| Hög detalj | [`onnx-community/BiRefNet_lite-ONNX`](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX) | 1024×1024 | 109 / 214 MB | WebGPU |
+En omexport av [`ZhengPeng7/BiRefNet_lite`](https://huggingface.co/ZhengPeng7/BiRefNet_lite)
+gjord för webbläsarkörning; enligt modellkortet matchar utdata PyTorch-referensen
+exakt.
 
-Båda är MIT och härstammar från
-[`ZhengPeng7/BiRefNet`](https://huggingface.co/ZhengPeng7/BiRefNet).
-512-varianten är en omexport gjord för just webbläsarkörning; enligt dess
-modellkort matchar utdata PyTorch-referensen exakt.
+### Varför bara en modell
 
-**Uppmätt här:** 1024-exporten dör på WASM med `std::bad_alloc` — dess
-aktiveringar spränger WASM-heapen. 512-exporten blir klar på ungefär fem
-sekunder på samma maskin.
+BiRefNets ONNX-grafer har **statiska** indatamått, så upplösningen är ett val av
+checkpoint och inte en inställning. 1024-exporten har ingen fungerande
+konfiguration i en webbläsare:
 
-Därför avgör hårdvaran förvalet: **finns WebGPU väljs Hög detalj automatiskt**,
-annars Standard. I fp16 skiljer det bara 15 MB i nedladdning mellan lägena, och
-den högre upplösningen är just vad hår behöver. Ett eget val i väljaren sparas
-och överlever förvalet.
+- **WASM:** `std::bad_alloc` — aktiveringarna spränger WASM-heapen.
+- **WebGPU:** shadern faller på gränsen nedan.
 
-Utan WebGPU är knappen avstängd med en förklaring, hellre än att låta någon
-välja något som inte kan fungera. Och eftersom hur mycket minne ett enskilt
-grafikkort faktiskt lämnar ifrån sig inte går att veta i förväg, faller ett
-misslyckat 1024-försök tillbaka till 512 och säger till — i stället för att bli
-en återvändsgränd.
+Så 512 är det som finns, och det tar ungefär fem sekunder.
 
-Den porträtttränade checkpointen
-([`BiRefNet-portrait`](https://huggingface.co/onnx-community/BiRefNet-portrait-ONNX))
-är bättre än båda på testflyende hår, men är 467 MB i fp16 mot 94 MB här. Det är
-inte ett rimligt förval för ett verktyg man öppnar en gång.
+Den porträtttränade
+[`BiRefNet-portrait`](https://huggingface.co/onnx-community/BiRefNet-portrait-ONNX)
+är bättre på flyende hår men är 467 MB i fp16 mot 94 MB här — inte rimligt för
+ett verktyg man öppnar en gång.
 
-### Licens, medvetet vald
+### Gränsen som avgör WebGPU
 
-Allt ovan är MIT och därmed användbart kommersiellt. BRIA:s RMBG-1.4 och
-RMBG-2.0 är marginellt bättre på svårt hår men ligger under CC BY-NC 4.0 och får
-alltså **inte** användas i kommersiellt eller redaktionellt arbete utan köpt
-licens. De är därför inte med.
+BiRefNets shader binder **11 lagringsbuffertar**. WebGPU-enheter annonserar ett
+tak för det, och Chrome på Apple Silicon rapporterar **10** — en för lite. Då
+avbryts körningen inne i ONNX Runtime:
+
+```
+numbers_storage_buffers_ <= limits_.maxStorageBuffersPerShaderStage
+Too many storage buffers in shader. Current: 11, Max is 10
+```
+
+Adaptern publicerar den siffran, så den går att läsa av *innan* något laddas ner
+eller körs. Verktyget kollar `maxStorageBuffersPerShaderStage` och väljer WASM
+när talet är för lågt, i stället för att haverera halvvägs. Sidan skriver ut
+vilket som gäller och varför.
+
+Kontrollen täcker bara den gräns vi känner till — en drivrutin kan fela på sätt
+som inget annonserar. Därför faller ett WebGPU-fel ändå tillbaka på WASM, minns
+det till nästa besök och säger till. WASM är golvet.
 
 ## Filformat
 
