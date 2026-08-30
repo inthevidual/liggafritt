@@ -82,10 +82,19 @@ class LiggaFritt {
         this.factModel = document.getElementById('factModel');
         this.factDevice = document.getElementById('factDevice');
         this.deviceNote = document.getElementById('deviceNote');
+        this.bylineCard = document.getElementById('bylineCard');
+        this.bylineFrame = document.getElementById('bylineFrame');
+        this.bylineCanvas = document.getElementById('bylineCanvas');
+        this.bylineCtx = this.bylineCanvas.getContext('2d');
+        this.bylineZoom = document.getElementById('bylineZoom');
 
         this.source = null;   // { bitmap, width, height, name }
         this.cutout = null;   // ImageData with the matte applied
         this.view = 'cutout';
+        // How the cut-out sits inside the byline frame. scale is a multiple of
+        // the cover-fit baseline; offsets are in frame pixels.
+        this.byline = { scale: 1, offsetX: 0, offsetY: 0 };
+        this.drag = null;
         this.modelPromise = null;
         this.device = null;
         this.busy = false;
@@ -167,6 +176,16 @@ class LiggaFritt {
         document.querySelectorAll('[data-ground]').forEach((btn) => {
             if (btn.tagName !== 'BUTTON') return;
             btn.addEventListener('click', () => this.setGround(btn.dataset.ground));
+        });
+
+        this.bindByline();
+
+        // The frame's box changes with the window, so keep the backing store
+        // and the framing in step with it.
+        window.addEventListener('resize', () => {
+            if (!this.cutout) return;
+            this.sizeBylineCanvas();
+            this.paintByline();
         });
 
         this.downloadBtn.addEventListener('click', () => this.download());
@@ -347,6 +366,11 @@ class LiggaFritt {
             ).resize(width, height);
 
             this.cutout = this.applyMatte(rgba, mask);
+            // drawImage scales, putImageData does not — the byline frame needs
+            // the former, so keep a bitmap alongside the pixels.
+            this.cutoutBitmap?.close?.();
+            this.cutoutBitmap = await createImageBitmap(this.cutout);
+            this.bounds = null;
             const seconds = ((performance.now() - started) / 1000).toFixed(1);
 
             this.showResult(seconds);
@@ -395,6 +419,194 @@ class LiggaFritt {
         return out;
     }
 
+    /* ── Byline framing ─────────────────────────────────────────────────────
+       The cut-out sits free on the article's dark header block, right-aligned
+       and bled through the rule that closes it. Nothing about that placement is
+       automatic, so the framing is direct: drag to move, wheel to scale.
+       ------------------------------------------------------------------- */
+
+    bindByline() {
+        const frame = this.bylineFrame;
+        if (!frame) return;
+
+        frame.addEventListener('pointerdown', (e) => {
+            if (!this.cutout) return;
+            frame.setPointerCapture(e.pointerId);
+            this.drag = { x: e.clientX, y: e.clientY, ox: this.byline.offsetX, oy: this.byline.offsetY };
+        });
+
+        frame.addEventListener('pointermove', (e) => {
+            if (!this.drag) return;
+            const dpr = this.bylineCanvas.width / frame.clientWidth;
+            this.byline.offsetX = this.drag.ox + (e.clientX - this.drag.x) * dpr;
+            this.byline.offsetY = this.drag.oy + (e.clientY - this.drag.y) * dpr;
+            this.paintByline();
+        });
+
+        const end = (e) => {
+            if (!this.drag) return;
+            this.drag = null;
+            frame.releasePointerCapture?.(e.pointerId);
+        };
+        frame.addEventListener('pointerup', end);
+        frame.addEventListener('pointercancel', end);
+
+        frame.addEventListener('wheel', (e) => {
+            if (!this.cutout) return;
+            e.preventDefault();
+            this.zoomBylineAt(Math.exp(-e.deltaY * 0.0015), e);
+        }, { passive: false });
+
+        this.bylineZoom.addEventListener('input', (e) => {
+            this.setBylineScale(parseFloat(e.target.value));
+        });
+
+        document.querySelectorAll('[data-viewport]').forEach((btn) => {
+            if (btn.tagName !== 'BUTTON') return;
+            btn.addEventListener('click', () => this.setViewport(btn.dataset.viewport));
+        });
+
+        const author = document.getElementById('authorInput');
+        const headline = document.getElementById('headlineInput');
+        const syncText = () => {
+            const name = author.value.trim();
+            // The name is a colon prefix inside the headline, so the colon comes
+            // from us — typing one should not produce two.
+            document.getElementById('previewAuthor').textContent = name ? name.replace(/:\s*$/, '') + ':' : '';
+            document.getElementById('previewHeadline').textContent = headline.value;
+        };
+        author.addEventListener('input', syncText);
+        headline.addEventListener('input', syncText);
+
+        document.getElementById('bylineResetBtn').addEventListener('click', () => this.fitByline());
+        document.getElementById('bylineDownloadBtn').addEventListener('click', () => this.downloadByline());
+    }
+
+    setViewport(which) {
+        document.getElementById('artikelPreview').dataset.viewport = which;
+        document.querySelectorAll('[data-viewport]').forEach((btn) => {
+            if (btn.tagName !== 'BUTTON') return;
+            const active = btn.dataset.viewport === which;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        });
+        // The frame's aspect changes between the two, so re-fit the backing store.
+        this.sizeBylineCanvas();
+        this.paintByline();
+    }
+
+    /** Match the backing store to the frame's CSS box, at 4x for a crisp export. */
+    sizeBylineCanvas() {
+        const frame = this.bylineFrame;
+        if (!frame) return;
+        const scale = 4;
+        const w = Math.round(frame.clientWidth * scale);
+        const h = Math.round(frame.clientHeight * scale);
+        if (this.bylineCanvas.width === w && this.bylineCanvas.height === h) return;
+        const prev = this.bylineCanvas.width || w;
+        this.bylineCanvas.width = w;
+        this.bylineCanvas.height = h;
+        // Keep the framing put when the box changes size.
+        const k = w / prev;
+        this.byline.offsetX *= k;
+        this.byline.offsetY *= k;
+    }
+
+    setBylineScale(scale, anchor = null) {
+        const next = Math.min(6, Math.max(1, scale));
+        const prev = this.byline.scale;
+        if (next === prev) return;
+
+        // Zoom about a point so what is under it stays put — the cursor when
+        // scrolling, the middle of the frame when using the slider. Scaling
+        // about the origin instead just shoves the subject out of view.
+        const at = anchor || { x: this.bylineCanvas.width / 2, y: this.bylineCanvas.height / 2 };
+        const k = next / prev;
+        this.byline.offsetX = at.x - (at.x - this.byline.offsetX) * k;
+        this.byline.offsetY = at.y - (at.y - this.byline.offsetY) * k;
+        this.byline.scale = next;
+        this.bylineZoom.value = next;
+        this.paintByline();
+    }
+
+    zoomBylineAt(factor, event) {
+        const r = this.bylineFrame.getBoundingClientRect();
+        const dpr = this.bylineCanvas.width / r.width;
+        this.setBylineScale(this.byline.scale * factor, {
+            x: (event.clientX - r.left) * dpr,
+            y: (event.clientY - r.top) * dpr,
+        });
+    }
+
+    /** The tight bounding box of everything the matte kept. */
+    subjectBounds() {
+        const { data, width, height } = this.cutout;
+        let minX = width; let minY = height; let maxX = -1; let maxY = -1;
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                if (data[(y * width + x) * 4 + 3] > 24) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0) return { x: 0, y: 0, width, height };
+        return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+    }
+
+    /**
+     * Default framing: fill the frame's width with the subject and sit it on the
+     * bottom edge, so the figure exits through the rule the way the page expects
+     * rather than floating in the middle of the block.
+     */
+    fitByline() {
+        if (!this.cutout) return;
+        this.sizeBylineCanvas();
+
+        const frame = { w: this.bylineCanvas.width, h: this.bylineCanvas.height };
+        const b = this.bounds || (this.bounds = this.subjectBounds());
+
+        const base = frame.w / b.width;
+        this.byline.scale = 1;
+        this.byline.base = base;
+        this.byline.offsetX = -b.x * base + (frame.w - b.width * base) / 2;
+        this.byline.offsetY = frame.h - (b.y + b.height) * base;
+
+        this.bylineZoom.value = 1;
+        this.paintByline();
+    }
+
+    paintByline() {
+        if (!this.cutout || !this.bylineCtx) return;
+        const ctx = this.bylineCtx;
+        const { width: w, height: h } = this.bylineCanvas;
+        ctx.clearRect(0, 0, w, h);
+
+        const k = (this.byline.base || 1) * this.byline.scale;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(this.cutoutBitmap, this.byline.offsetX, this.byline.offsetY,
+            this.cutout.width * k, this.cutout.height * k);
+    }
+
+    async downloadByline() {
+        if (!this.cutout) return;
+        const blob = await new Promise((r) => this.bylineCanvas.toBlob(r, 'image/png'));
+        if (!blob) {
+            this.fail('Kunde inte skapa PNG', 'Webbläsaren nekade exporten.');
+            return;
+        }
+        const author = document.getElementById('authorInput').value.trim() || 'byline';
+        const slug = author.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${slug}_byline.png`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+    }
+
     /* ── Output ─────────────────────────────────────────────────────────── */
 
     showResult(seconds) {
@@ -402,10 +614,12 @@ class LiggaFritt {
         this.dropZone.classList.remove('is-busy');
         this.statusCard.hidden = true;
         this.resultCard.hidden = false;
+        this.bylineCard.hidden = false;
         this.downloadBtn.disabled = false;
         this.resultMeta.textContent =
             `${this.source.name} — ${this.source.width}×${this.source.height} px, frilagd på ${seconds} s`;
         this.setView('cutout');
+        this.fitByline();
     }
 
     setView(view) {
@@ -467,12 +681,16 @@ class LiggaFritt {
 
     reset() {
         this.source?.bitmap?.close?.();
+        this.cutoutBitmap?.close?.();
         this.source = null;
         this.cutout = null;
+        this.cutoutBitmap = null;
+        this.bounds = null;
         this.busy = false;
         this.dropZone.classList.remove('loaded', 'is-busy');
         document.getElementById('dropName').textContent = '';
         this.resultCard.hidden = true;
+        this.bylineCard.hidden = true;
         this.statusCard.hidden = true;
         this.downloadBtn.disabled = true;
         this.fileInput.value = '';

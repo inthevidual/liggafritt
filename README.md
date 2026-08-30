@@ -83,6 +83,28 @@ dessutom slut på minne på WASM, så den skulle bara fungera med WebGPU — och
 `/decoder/Concat` med 1024 indata är en större sak än den låter. Inte gjort,
 och inte nödvändigt för det här verktyget.
 
+## Byline
+
+Verktygets huvudsakliga användning är porträttet i ett artikelhuvud, så
+resultatet går att placera: dra i bilden, rulla för att zooma, eller använd
+reglaget. Förhandsvisningen speglar hur huvudet är byggt —
+
+- taggrad, sedan en `<h1>` vars **första span är skribentens namn som ett
+  kolonprefix**, satt tillbaka i grått, följt av rubriken i vitt;
+- porträttet högerställt i det mörka blocket och **beskuret av strecket som
+  avslutar blocket**, inte en rund avatar;
+- bildtext med fotobyline inline efter `Foto:`, aldrig som egen högerställd rad.
+
+Desktop och mobil går att växla mellan, eftersom rubriken bryts olika och
+porträttet är mindre i den smala spalten.
+
+Startläget fyller ramens bredd med motivet och ställer det på nederkanten, så
+figuren går ut genom strecket i stället för att sväva. Bylinen sparas som PNG
+med genomskinlig bakgrund, beskuren precis som i förhandsvisningen.
+
+Förhandsvisningen är avsiktligt omärkt. Den visar placering och är inte en
+återgivning av någon tidnings sidhuvud.
+
 ## Filformat
 
 JPG, PNG och AVIF avkodas av webbläsaren själv. **TIFF har ingen inbyggd

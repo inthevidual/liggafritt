@@ -49,7 +49,7 @@
     <link rel="preconnect" href="https://huggingface.co">
 
     <link rel="stylesheet" href="styles/brand.css?v=2f060107">
-    <link rel="stylesheet" href="styles/app.css?v=8c3b00c1">
+    <link rel="stylesheet" href="styles/app.css?v=6be37a75">
 </head>
 <body>
 
@@ -136,6 +136,67 @@
                     <div class="ground-row__actions">
                         <button type="button" id="resetBtn" class="btn btn--ghost btn--sm">Rensa</button>
                         <button type="button" id="downloadBtn" class="btn" disabled>Spara PNG</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BYLINE -->
+        <section class="card section" id="bylineCard" aria-label="Byline" hidden>
+            <div class="card__body">
+                <div class="result-head">
+                    <div class="result-head__meta">
+                        <h2 class="result-title">Placering i artikelhuvud</h2>
+                        <p class="description">Dra i porträttet för att placera det, rulla för att zooma. Det nedre strecket beskär bilden, precis som i artikeln.</p>
+                    </div>
+                    <div class="result-head__actions">
+                        <div class="segmented" role="group" aria-label="Visa som">
+                            <button type="button" class="segmented__option is-active" data-viewport="desktop" aria-pressed="true">Desktop</button>
+                            <button type="button" class="segmented__option" data-viewport="mobile" aria-pressed="false">Mobil</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A layout preview of the article header: tag row, an H1 whose
+                     first span is the writer's name as a colon prefix, and the
+                     cut-out right-aligned and bled to the rule that closes the
+                     block. Deliberately unbranded — it shows placement, it is not
+                     a reproduction of anyone's front page. -->
+                <div class="artikel" id="artikelPreview" data-viewport="desktop">
+                    <div class="artikel__block">
+                        <p class="artikel__tags"><span>Krönika</span><span>Valet 2026</span></p>
+                        <h1 class="artikel__h1">
+                            <span class="artikel__author" id="previewAuthor">Mållgan Johansson:</span>
+                            <span class="artikel__title" id="previewHeadline">Ted Cruz är en fi-fi-finfin kille.</span>
+                        </h1>
+                        <div class="artikel__portrait" id="bylineFrame" title="Dra för att placera, rulla för att zooma">
+                            <canvas id="bylineCanvas" role="img" aria-label="Porträtt i artikelhuvudet"></canvas>
+                        </div>
+                    </div>
+                    <p class="artikel__caption">Var och en har medhavt staket och grill. Foto: Fredrik Sandberg /TT</p>
+                </div>
+
+                <div class="control-row">
+                    <label class="label" for="bylineZoom">Zoom</label>
+                    <input type="range" id="bylineZoom" class="range" min="1" max="6" step="0.01" value="1" aria-label="Zooma porträttet">
+                </div>
+
+                <div class="byline-fields">
+                    <div>
+                        <label class="label" for="authorInput">Skribent</label>
+                        <input type="text" id="authorInput" class="input field-input" value="Mållgan Johansson" autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="label" for="headlineInput">Artikelrubrik</label>
+                        <input type="text" id="headlineInput" class="input field-input" value="Ted Cruz är en fi-fi-finfin kille." autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="ground-row">
+                    <span class="description">Sparas som PNG med genomskinlig bakgrund, beskuren som i förhandsvisningen.</span>
+                    <div class="ground-row__actions">
+                        <button type="button" id="bylineResetBtn" class="btn btn--ghost btn--sm">Återställ vy</button>
+                        <button type="button" id="bylineDownloadBtn" class="btn">Spara byline-PNG</button>
                     </div>
                 </div>
             </div>
@@ -230,6 +291,6 @@
     </script>
 
     <script src="vendor/utif.js?v=e3e76115"></script>
-    <script type="module" src="script.js?v=2b98e147"></script>
+    <script type="module" src="script.js?v=87cf6718"></script>
 </body>
 </html>

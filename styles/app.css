@@ -338,3 +338,113 @@
 .facts__note {
   color: var(--color-text-muted);
 }
+
+/* ── Article-header preview ───────────────────────────────────────────────────
+   A preview of where the cut-out lands: dark block, tag row, an H1 whose first
+   span is the writer's name as a colon prefix, and the portrait right-aligned
+   and bled to the rule that closes the block.
+
+   This is the one place that uses raw ramps rather than semantic tokens. It is
+   deliberate: the block is simulating a fixed dark article header, so it must
+   stay dark whichever theme the tool itself is in. Everywhere else, §2.1 holds.
+   ------------------------------------------------------------------------- */
+
+.artikel {
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  /* Roughly the article column at desktop width — letting the block run the
+     full width of the card makes the headline look stranded. */
+  max-width: 900px;
+}
+
+.artikel__block {
+  position: relative;
+  background: var(--blue-800);
+  padding: 20px 24px 0;
+  /* The rule that closes the block, and crops the portrait. */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.artikel__tags {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--blue-200);
+}
+
+.artikel__h1 {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 18px;
+  max-width: 62%;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+/* The name is part of the headline, set back in grey; the title carries. */
+.artikel__author { color: #8FA3B4; display: block; }
+.artikel__title { color: #FFFFFF; }
+
+/* Bottom-anchored so the figure exits through the rule rather than floating. */
+.artikel__portrait {
+  position: absolute;
+  right: 24px;
+  bottom: 0;
+  width: 150px;
+  height: 175px;
+  cursor: grab;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.artikel__portrait:active { cursor: grabbing; }
+.artikel__portrait canvas { display: block; width: 100%; height: 100%; }
+
+.artikel__caption {
+  margin: 0;
+  padding: 10px 24px 14px;
+  background: var(--color-background-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* Mobile: narrower column so the headline wraps to three lines, smaller
+   portrait, still bottom-cropped by the rule. */
+.artikel[data-viewport='mobile'] { max-width: 375px; }
+.artikel[data-viewport='mobile'] .artikel__block { padding: 16px 16px 0; min-height: 210px; }
+.artikel[data-viewport='mobile'] .artikel__h1 { font-size: 24px; max-width: 58%; }
+.artikel[data-viewport='mobile'] .artikel__portrait { right: 16px; width: 118px; height: 138px; }
+.artikel[data-viewport='mobile'] .artikel__caption { padding: 10px 16px 14px; }
+
+@media (max-width: 599px) {
+  .artikel__block { padding: 16px 16px 0; }
+  .artikel__h1 { font-size: 24px; max-width: 58%; }
+  .artikel__portrait { right: 16px; width: 118px; height: 138px; }
+  .artikel__caption { padding: 10px 16px 14px; }
+}
+
+/* ── Byline fields ────────────────────────────────────────────────────────── */
+
+.byline-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 768px) {
+  .byline-fields { grid-template-columns: 1fr 1fr; }
+}
