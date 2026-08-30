@@ -22,10 +22,15 @@
   .og__wordmark { --logoColor: currentColor; height: 34px; width: auto; fill: currentColor; }
   .og__rule { width: 2px; height: 44px; border-radius: 999px; background: currentColor; opacity: 0.2; }
   .og__product { font-family: var(--font-display); font-weight: 700; font-size: 40px; letter-spacing: -0.02em; }
-  .og__body { position: relative; max-width: 560px; }
-  /* Grey through the middle clause only; the words either side stay in ink. */
-  .og__headline { font-family: var(--font-head); font-weight: 600; font-size: 58px; line-height: 1.06;
+  .og__body { position: relative; max-width: 620px; }
+  /* Grey through the middle clause only; the words either side stay in ink.
+     The break is explicit and each line is nowrap, so "att bilden ska" cannot
+     be split across lines however the type is sized. */
+  /* 50px: measured, the largest step that keeps line one clear of the figure.
+     52 fits by two pixels, which is not clearance. */
+  .og__headline { font-family: var(--font-head); font-weight: 600; font-size: 50px; line-height: 1.06;
                   letter-spacing: -0.02em; margin: 0 0 18px; }
+  .og__line { display: block; width: max-content; max-width: none; white-space: nowrap; }
   .og__muted { color: #C3C2C1; }
   .og__sub { font-family: var(--font-body); font-size: 24px; line-height: 1.4;
              color: var(--color-text-secondary); margin: 0; }
@@ -43,7 +48,10 @@
       <span class="og__product">Ligga fritt</span>
     </div>
     <div class="og__body">
-      <h1 class="og__headline">N&auml;r du vill <span class="og__muted">att bilden ska</span> ligga fritt.</h1>
+      <h1 class="og__headline">
+        <span class="og__line">N&auml;r du vill <span class="og__muted">att bilden ska</span></span>
+        <span class="og__line">ligga fritt.</span>
+      </h1>
       <p class="og__sub">Porträtt till PNG med genomskinlig bakgrund &mdash; i webbläsaren, utan uppladdning.</p>
     </div>
     <div class="og__foot">
