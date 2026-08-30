@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds the Ligga Fritt brand assets from the Illustrator export.
+// Builds the Ligga fritt brand assets from the Illustrator export.
 //
 //   node brand/tools/build-mark.mjs
 //
@@ -114,7 +114,7 @@ svgo(src, t('p1.svg'), PASS1);
 fs.writeFileSync(t('cls.svg'), classifyFills(fs.readFileSync(t('p1.svg'), 'utf8')));
 svgo(t('cls.svg'), t('mark.svg'), PASS2);
 fs.writeFileSync(out('mark.svg'),
-  fs.readFileSync(t('mark.svg'), 'utf8').replace(/(<svg[^>]*>)/, '$1<title>Ligga Fritt</title>'));
+  fs.readFileSync(t('mark.svg'), 'utf8').replace(/(<svg[^>]*>)/, '$1<title>Ligga fritt</title>'));
 console.log(`  brand/mark.svg ${kb(out('mark.svg'))} (source, not served)`);
 
 // ── rasters ────────────────────────────────────────────────────────────────

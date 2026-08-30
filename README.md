@@ -1,4 +1,4 @@
-# Ligga Fritt
+# Ligga fritt
 
 Frilägger porträtt till PNG med genomskinlig bakgrund. Allt sker i webbläsaren —
 bilderna laddas aldrig upp någonstans.
@@ -36,9 +36,18 @@ modellkort matchar utdata PyTorch-referensen exakt.
 
 **Uppmätt här:** 1024-exporten dör på WASM med `std::bad_alloc` — dess
 aktiveringar spränger WASM-heapen. 512-exporten blir klar på ungefär fem
-sekunder på samma maskin. Därför är Standard förval, och Hög detalj erbjuds bara
-där WebGPU kan bära den. Knappen är avstängd med en förklaring i övriga fall,
-hellre än att låta någon välja något som inte kan fungera.
+sekunder på samma maskin.
+
+Därför avgör hårdvaran förvalet: **finns WebGPU väljs Hög detalj automatiskt**,
+annars Standard. I fp16 skiljer det bara 15 MB i nedladdning mellan lägena, och
+den högre upplösningen är just vad hår behöver. Ett eget val i väljaren sparas
+och överlever förvalet.
+
+Utan WebGPU är knappen avstängd med en förklaring, hellre än att låta någon
+välja något som inte kan fungera. Och eftersom hur mycket minne ett enskilt
+grafikkort faktiskt lämnar ifrån sig inte går att veta i förväg, faller ett
+misslyckat 1024-försök tillbaka till 512 och säger till — i stället för att bli
+en återvändsgränd.
 
 Den porträtttränade checkpointen
 ([`BiRefNet-portrait`](https://huggingface.co/onnx-community/BiRefNet-portrait-ONNX))
@@ -75,7 +84,7 @@ där. Det implementerar `designsystem/brand-book.md` §2–§5: råskalor, seman
 roller och de tre temablocken. Rör det bara om det ska ändras i båda projekten,
 och kopiera i så fall över filen i stället för att redigera en av dem.
 
-`styles/app.css` är det som är specifikt för Ligga Fritt.
+`styles/app.css` är det som är specifikt för Ligga fritt.
 
 ## Märket
 

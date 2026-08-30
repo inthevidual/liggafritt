@@ -1,5 +1,5 @@
 /* =============================================================================
-   Ligga Fritt — portrait background removal, entirely in the browser.
+   Ligga fritt — portrait background removal, entirely in the browser.
 
    The matte comes from BiRefNet (MIT), run through transformers.js on WebGPU
    where available and WASM otherwise. Nothing is uploaded: the file is decoded
@@ -53,7 +53,10 @@ const MODELS = {
     },
 };
 
-const DEFAULT_QUALITY = 'standard';
+// Where WebGPU can carry it, 1024 is the better default: it is only 15 MB more
+// to download than 512 in fp16, and the extra resolution is exactly what hair
+// needs. Without WebGPU it cannot run at all, so 512 it is.
+const defaultQuality = (webgpu) => (webgpu ? 'detail' : 'standard');
 const QUALITY_KEY = 'lf.quality';
 
 const ACCEPTED = /\.(jpe?g|png|tiff?|avif)$/i;
@@ -84,14 +87,18 @@ class LiggaFritt {
         this.view = 'cutout';
         this.models = new Map(); // quality -> promise of { model, processor }
         this.device = null;
+        this.forceWasm = false;  // set once WebGPU has proved itself unusable
         this.busy = false;
 
-        let saved = null;
-        try { saved = localStorage.getItem(QUALITY_KEY); } catch { /* private mode */ }
-        this.quality = MODELS[saved] ? saved : DEFAULT_QUALITY;
+        // An explicit choice outlives the default; otherwise the device decides.
+        try { this.saved = localStorage.getItem(QUALITY_KEY); } catch { this.saved = null; }
+        this.quality = 'standard';
 
         this.bindEvents();
-        this.detectDevice().then(() => this.syncQuality());
+        this.detectDevice().then(() => {
+            this.quality = MODELS[this.saved] ? this.saved : defaultQuality(this.webgpu);
+            this.syncQuality();
+        });
     }
 
     get model() { return MODELS[this.quality]; }
@@ -102,7 +109,7 @@ class LiggaFritt {
         // navigator.gpu existing is not enough — an adapter request can still
         // fail on a blocklisted driver, and then WASM is the honest answer.
         let webgpu = false;
-        if (navigator.gpu) {
+        if (navigator.gpu && !this.forceWasm) {
             try { webgpu = Boolean(await navigator.gpu.requestAdapter()); } catch { webgpu = false; }
         }
         this.device = webgpu ? 'webgpu' : 'wasm';
@@ -133,7 +140,7 @@ class LiggaFritt {
         });
 
         if (this.model.needsWebGPU && !this.webgpu) {
-            this.quality = DEFAULT_QUALITY;
+            this.quality = 'standard';
             return this.syncQuality();
         }
 
@@ -354,6 +361,7 @@ class LiggaFritt {
             ({ model, processor } = await this.loadModel());
         } catch (err) {
             console.error(err);
+            if (await this.retryInSafeMode('Modellen kunde inte laddas')) return;
             this.fail('Modellen kunde inte laddas',
                 'Kontrollera nätverket och försök igen. Inget har skickats någonstans.');
             return;
@@ -381,8 +389,34 @@ class LiggaFritt {
             this.showResult(seconds);
         } catch (err) {
             console.error(err);
+            if (await this.retryInSafeMode('Beräkningen misslyckades')) return;
             this.fail('Friläggningen misslyckades', String(err?.message || err));
         }
+    }
+
+    /**
+     * Step down to the configuration that is known to work anywhere — 512 on
+     * WASM — and say so, rather than presenting a dead end.
+     *
+     * Two different things can go wrong and neither is knowable in advance: a
+     * GPU may not hand over enough memory for 1024, or WebGPU may report an
+     * adapter and still fail to produce a working device on a bad driver. The
+     * second is why this drops the *device* as well as the model; falling back
+     * to a smaller model on a broken GPU would just fail again.
+     */
+    async retryInSafeMode(reason) {
+        if (this.forceWasm && this.quality === 'standard') return false;
+
+        this.forceWasm = true;
+        this.quality = 'standard';
+        this.models.clear();
+        try { localStorage.setItem(QUALITY_KEY, 'standard'); } catch { /* private mode */ }
+
+        await this.detectDevice();
+        this.syncQuality();
+        this.setStatus('Byter till standardläge', `${reason} — kör om i 512×512 utan grafikacceleration.`);
+        await this.run();
+        return true;
     }
 
     toImageData(bitmap, width, height) {

@@ -1,5 +1,5 @@
 /* =============================================================================
-   Ligga Fritt — app-specific styling
+   Ligga fritt — app-specific styling
    Depends on styles/brand.css, which is the shared Svenska CP-Tjänst design
    system and is byte-identical to the copy in thebanfinator. Only semantic
    tokens (--color-*) below the ramps layer — never a raw ramp (brand-book §2.1).
