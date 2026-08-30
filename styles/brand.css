@@ -1,0 +1,541 @@
+/* =============================================================================
+   Svenska CP-Tjänst — design system
+   Implements designsystem/brand-book.md §2–§5 as plain CSS.
+
+   Two layers, and app.css may only touch the second one:
+     1. Raw ramps      --blue-400, --brown-200 …   constants, same in both themes
+     2. Semantic roles --color-text-primary …      redefined per theme
+
+   A rule that writes var(--gray-600) has hard-coded a light-mode assumption.
+   It must write var(--color-text-secondary).                            (§2.1)
+   ========================================================================== */
+
+/* ── §3.2 Fonts — self-hosted woff2, content-hashed, swap ─────────────────── */
+
+/* SvD Ester Blenda — display. The brand lockup, nothing else. */
+@font-face { font-family: 'SvD Ester Blenda'; src: url('../fonts/SvDEsterBlenda-Regular_4d499fd4.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'SvD Ester Blenda'; src: url('../fonts/SvDEsterBlenda-Medium_ce71f11f.woff2')  format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'SvD Ester Blenda'; src: url('../fonts/SvDEsterBlenda-Bold_2775ffc4.woff2')    format('woff2'); font-weight: 700; font-display: swap; }
+
+/* Sueca Hd — every heading, and every large number. */
+@font-face { font-family: 'Sueca Hd'; src: url('../fonts/sueca-web-hd-light_30d82c42.woff2')    format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Sueca Hd'; src: url('../fonts/sueca-web-hd-semibold_c8feba36.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Sueca Hd'; src: url('../fonts/sueca-web-hd-bold_af5dba33.woff2')     format('woff2'); font-weight: 700; font-display: swap; }
+
+/* Sueca Tx — long-form prose. §3.1 flags this as declared-but-unused in
+   lrstats and says to decide rather than inherit the ambiguity. Decided: it is
+   applied here, via .prose, to the instructional copy. */
+@font-face { font-family: 'Sueca Tx'; src: url('../fonts/sueca-text-regular_593d3599.woff2')        format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Sueca Tx'; src: url('../fonts/sueca-text-regular-italic_51117951.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Sueca Tx'; src: url('../fonts/sueca-text-extrabold_ae7fcb27.woff2')      format('woff2'); font-weight: 800; font-display: swap; }
+
+/* ── §2.3 Raw ramps — constants, identical in both themes ─────────────────── */
+
+:root {
+  --blue-100: #ECF3FA;  --blue-200: #42C0F0;  --blue-300: #0098DA;  --blue-400: #0D4C80;
+  --blue-500: #144166;  --blue-600: #00355F;  --blue-700: #0B2337;  --blue-800: #031420;
+  --gray-100: #F7F6F5;  --gray-200: #EBEBEB;  --gray-300: #D9D9D9;  --gray-400: #C3C2C1;
+  --gray-500: #918F8D;  --gray-600: #605E5D;  --gray-700: #2E2E2E;  --gray-800: #1D1D1B;
+  --brown-100: #FCF4EC; --brown-200: #F4EBE2; --brown-300: #EEDECE; --brown-400: #E4CCB3;
+  --brown-500: #8F6D62; --brown-600: #5C403C; --brown-700: #2A1E22; --brown-800: #0C090A;
+  --green-300: #52C18C; --green-400: #27B16F; --green-500: #1F8E59; --green-600: #176A43;
+  --orange-300: #F57238; --orange-500: #F25538; --orange-600: #923C0D;
+  --red-400: #EE747B;   --red-500: #EA515A;   --red-600: #BB4148;   --red-700: #8C3136;
+  --yellow-400: #FFE400; --yellow-500: #CCB600; --yellow-600: #998900;
+  --purple-300: #AE98E8; --purple-400: #7557D8; --purple-500: #6148B5;
+  --indigo-300: #97A2E8; --indigo-400: #556CD8; --indigo-500: #465AB6;
+  --pink-400: #E83183;  --pink-500: #B7236D;
+  --cyan-400: #4B9ACC;
+
+  /* §3.1 Families */
+  --font-display: 'SvD Ester Blenda', Georgia, serif;
+  --font-head: 'Sueca Hd', Georgia, serif;
+  --font-body: 'Sueca Tx', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* §4.1 Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+
+  /* §4.3 Elevation — deliberately flat, and these are all of them */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-tooltip: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-popover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* ── §2.2 The three theme scopes ──────────────────────────────────────────────
+   Three states, not two: explicit light, explicit dark, and follow-the-OS
+   (the default, which stamps no attribute). Hence three blocks, in this order.
+   Every token gets its only unconditional definition in bare :root — a colour
+   first defined inside a media query is undefined for half your users.
+   ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* §2.4 Semantic roles — light. Note the inversion: background-secondary is
+     the page ground and surface-raised is the card, so cards are lighter than
+     the page. The relationship carries, not the absolute value. */
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: var(--brown-100);
+  --color-background-tertiary: var(--brown-200);
+  --color-surface-raised: #FFFFFF;
+  --color-text-primary: var(--gray-800);
+  --color-text-secondary: var(--gray-600);
+  --color-text-muted: var(--gray-500);
+  --color-border-primary: #E5E2E1;
+  --color-border-secondary: #F2EFEE;
+  --color-action: var(--blue-400);
+  --color-action-hover: var(--blue-500);
+  --color-action-text: #FFFFFF;
+  --color-focus: var(--blue-300);
+  --color-good: var(--green-500);
+  --color-warning: var(--yellow-600);
+  --color-critical: var(--red-600);
+}
+
+/* The OS default. The :not([data-theme='light']) guard is what lets an
+   explicit light choice win on a dark-mode machine. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-background-primary: var(--blue-800);
+    --color-background-secondary: var(--blue-700);
+    --color-background-tertiary: #12314B;
+    --color-surface-raised: var(--blue-700);
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #B9C7D4;
+    --color-text-muted: #8A9BAB;
+    --color-border-primary: rgba(255, 255, 255, 0.16);
+    --color-border-secondary: rgba(255, 255, 255, 0.09);
+    --color-action: var(--blue-300);
+    --color-action-hover: var(--blue-200);
+    --color-action-text: var(--blue-800);
+    --color-focus: var(--blue-200);
+    --color-good: var(--green-400);
+    --color-warning: var(--yellow-500);
+    --color-critical: var(--red-500);
+  }
+}
+
+/* Duplicated on purpose. It is the only way an explicit choice beats the OS in
+   both directions with plain CSS. Keep in sync with the block above or dark
+   mode silently rots. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-background-primary: var(--blue-800);
+  --color-background-secondary: var(--blue-700);
+  --color-background-tertiary: #12314B;
+  --color-surface-raised: var(--blue-700);
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #B9C7D4;
+  --color-text-muted: #8A9BAB;
+  --color-border-primary: rgba(255, 255, 255, 0.16);
+  --color-border-secondary: rgba(255, 255, 255, 0.09);
+  --color-action: var(--blue-300);
+  --color-action-hover: var(--blue-200);
+  --color-action-text: var(--blue-800);
+  --color-focus: var(--blue-200);
+  --color-good: var(--green-400);
+  --color-warning: var(--yellow-500);
+  --color-critical: var(--red-500);
+}
+
+/* ── §2.5 Global base rules ───────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  border-color: var(--color-border-primary); /* so a bare `border` works */
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: 'tnum' 0; /* proportional by default; opt in below */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular { font-variant-numeric: tabular-nums; } /* §6.1 — opt in */
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--blue-200);
+  color: var(--blue-800);
+}
+
+img, svg, canvas { display: block; max-width: 100%; }
+
+/* ── §3.3 Type scale ──────────────────────────────────────────────────────────
+   Sizes are literal pixel values because the scale is typographic, not modular.
+   Negative tracking scales with size: -0.02em at 24px and up, -0.01em at 15px,
+   none below. Serif display type set loose looks accidental.
+   ------------------------------------------------------------------------- */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-head);
+  margin: 0;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* The system's signature: a serif at large size, tight tracking, tabular
+   figures. Numbers are set in font-head, never in the UI sans. That single
+   choice is why this reads like a newspaper rather than an admin panel. */
+.hero-number {
+  font-family: var(--font-head);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.prose {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  max-width: 65ch;
+}
+
+.label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.description {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.version-stamp {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+/* ── §3.4 Marks ───────────────────────────────────────────────────────────────
+   The wordmark is inlined in the markup, not loaded as <img>, so --logoColor
+   resolves to currentColor and the mark is ink on light and white on dark with
+   one file and no filters. The square Banfa mark keeps its own colours baked
+   in and so is used as an <img> — it must not follow the text colour.
+   ------------------------------------------------------------------------- */
+
+.wordmark {
+  --logoColor: currentColor;
+  height: 0.9em;
+  width: auto;
+  flex: none;
+  fill: currentColor;
+}
+
+/* The brand lockup: mark, wordmark, a 2px rounded rule at 20% opacity, then the
+   product name in the display serif. Every dimension is in em off one clamp, so
+   it scales as a unit — and the mark being *inside* the flex row is what puts it
+   on the wordmark's centre axis instead of the block's. */
+.lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.56em;
+  font-size: clamp(17px, 4.4vw, 30px);
+  color: var(--color-text-primary);
+  min-width: 0;
+}
+
+.lockup__rule {
+  width: 2px;
+  height: 1.23em;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.2;
+  flex: none;
+}
+
+.lockup__product {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* ── §5.1 Button ──────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--color-action);
+  color: var(--color-action-text);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover:not(:disabled) { background: var(--color-action-hover); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+
+.btn--outline {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-primary);
+}
+.btn--outline:hover:not(:disabled) { background: var(--color-background-tertiary); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+.btn--ghost:hover:not(:disabled) { background: var(--color-background-tertiary); }
+
+.btn--subtle {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
+}
+.btn--subtle:hover:not(:disabled) { background: var(--color-border-primary); }
+
+.btn--destructive {
+  background: var(--color-critical);
+  color: #FFFFFF;
+}
+.btn--destructive:hover:not(:disabled) { background: var(--color-critical); opacity: 0.9; }
+
+.btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+.btn--xs { height: 28px; padding: 0 8px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn--lg { height: 40px; padding: 0 24px; }
+.btn--icon { height: 36px; width: 36px; padding: 0; }
+.btn--icon.btn--sm { height: 32px; width: 32px; }
+.btn--block { width: 100%; }
+
+/* ── §5.2 Card ────────────────────────────────────────────────────────────── */
+
+.card {
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.card__body { padding: 20px; }               /* §4.2 p-5 */
+.card__header { padding: 20px 20px 12px; }   /* p-5 pb-3 */
+.card__content { padding: 0 20px 20px; }     /* p-5 pt-0 */
+
+/* ── §5.3 Badge ───────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.badge--outline {
+  background: transparent;
+  border-color: var(--color-border-primary);
+  color: var(--color-text-secondary);
+}
+
+/* Status tints. §2.4: status colours never appear without a word beside them —
+   colour alone is not a state. */
+.badge--good     { background: color-mix(in srgb, var(--color-good) 12%, transparent);     color: var(--color-good); }
+.badge--warning  { background: color-mix(in srgb, var(--color-warning) 14%, transparent);  color: var(--color-warning); }
+.badge--critical { background: color-mix(in srgb, var(--color-critical) 12%, transparent); color: var(--color-critical); }
+
+/* ── Form controls ────────────────────────────────────────────────────────── */
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  transition: border-color 0.15s ease;
+}
+
+.input:hover { border-color: var(--color-text-muted); }
+.input::placeholder { color: var(--color-text-muted); }
+.input--lg { height: 40px; font-size: 15px; }
+
+/* Range. Styled from scratch because the native control ignores the token
+   system, and the thumb is the one place this design allows a filled circle. */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border-primary);
+}
+
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-action);
+}
+
+.range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border-primary);
+}
+
+.range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-action);
+}
+
+.range:hover::-webkit-slider-thumb { background: var(--color-action-hover); }
+.range:hover::-moz-range-thumb { background: var(--color-action-hover); }
+
+/* ── §4.4 Layout shell ────────────────────────────────────────────────────────
+   Banfinator is a single-page tool, so the sidebar and filter bar of the
+   dashboard shell do not apply. The header, the max-width and the z-ladder do.
+
+   z-ladder — a fixed ladder, do not improvise within it:
+     20 filter bar · 30 backdrop, desktop sidebar · 40 header · 50 overlays
+   ------------------------------------------------------------------------- */
+
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--color-border-primary);
+  background: var(--color-background-primary);
+}
+
+.site-header__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.site-main {
+  padding: 20px 16px;
+}
+
+.site-footer {
+  border-top: 1px solid var(--color-border-primary);
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+@media (min-width: 640px) {
+  .site-header__inner { padding: 12px 24px; }
+  .site-main { padding: 20px 24px; }
+}
+
+/* §4.2 Section → section */
+.section { margin-bottom: 20px; }
+
+/* ── §4.5 Motion — almost none, and all of it fast ────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+.fade-in { animation: fade-in 0.18s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────────── */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
