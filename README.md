@@ -79,16 +79,33 @@ och kopiera i så fall över filen i stället för att redigera en av dem.
 
 ## Märket
 
-`brand/mark-placeholder.svg` är en **platshållare** — en urklippt byst mot
-transparensrutmönster, ritad i CP-Tjänsts palett och avsiktligt enkel så att den
-läses som ett provisorium. Detsamma gäller `brand/og.png`.
+`brand/liggafritt-source.svg` är Illustrator-exporten. Allt annat under `brand/`
+byggs från den:
 
-Byt båda när den riktiga formgivningen kommer:
+```
+node brand/tools/build-mark.mjs    # mark.svg, mark.webp, ikoner
+node brand/tools/build-og.mjs      # og.png
+node brand/tools/stamp-assets.mjs  # nya innehållshashar i index.htm
+```
 
-1. Lägg den riktiga SVG:n som `brand/mark.svg`.
-2. Peka om `<img class="brand-mark">` i `index.htm` och ikongenereringen.
-3. `node brand/tools/build-og.mjs` för delningsbilden.
-4. `node brand/tools/stamp-assets.mjs` — annars serverar webbläsare den gamla.
+Bygget optimerar vektorn (188 → 123 kB) och slår ihop de färgpar som ligger
+under den perceptuella tröskeln — tre par här, ΔE 0,84 till 1,37, palett 15 → 12
+färger. Avsiktliga tonsteg ligger långt över ΔE 2 och lämnas orörda.
+
+**Sidan laddar inte SVG:n.** Märket serveras som `mark.webp` (17 kB) eftersom
+det är ett tecknat porträtt med ~500 paths: vektorn förblir stor hur hårt den än
+pressas, medan en 160px webp täcker 3× DPR vid sidhuvudets 45 px. Vid 16–48 px
+vinner en favicon ingenting på att vara vektor. `mark.svg` är den redigerbara
+mastern.
+
+Ingen beskärning görs, till skillnad från Banfinatorns märke: den här
+originalfilen ramar redan in sig själv. Uppmätt spänner halotonens gloria
+x 102..1194, y 14..1080 i en kvadrat på 1254, alltså fri från alla kanter, och
+bara axlarna går ut genom underkanten — vilket är rätt för en byst.
+
+En sak att avgöra: märket visar hela bysten, så ansiktet blir omkring 15 px i
+sidhuvudet. Banfinatorn beskärs till huvudet just därför. Säg till om samma
+behandling ska göras här — det är en rad i `build-mark.mjs`.
 
 ## Cache busting
 
@@ -104,7 +121,6 @@ att webbläsare serverade gammal CSS i systerprojektet.
 
 ## Kvar att göra
 
-- Riktigt märke och OG-bild.
 - Domän och `CNAME` — sidan antar `liggafritt.cptjanst.se` i OG-taggarna.
 - Ingen kantjustering ännu (tröskel, ludd, urkantning). BiRefNets matta är mjuk
   och brukar duga rakt av; lägg bara till reglage om verkligt bruk kräver det.
