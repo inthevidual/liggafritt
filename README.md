@@ -85,38 +85,50 @@ och inte nödvändigt för det här verktyget.
 
 ## Byline
 
-Verktygets huvudsakliga användning är porträttet i ett artikelhuvud, så
+Verktygets huvudsakliga användning är porträttet på en artikelsida, så
 resultatet går att placera: dra i bilden, rulla för att zooma, eller använd
-reglaget. **Stora förhandsvisningen och artikelhuvudet delar samma utsnitt** —
-drar man i den ena flyttas den andra. Den stora visar var utsnittet ligger med
-en ram och dämpad omgivning; artikelhuvudet visar hur det faktiskt ser ut.
+reglaget.
+
+### Det som laddas upp är en kvadrat
+
+Det är hela poängen med beskärningen. SvD serverar **samma fil** till
+artikelhuvudet och skribentsidan — samma `?s=`-hash på båda ställena — och
+renderar den olika:
+
+| Plats | Rendering |
+|---|---|
+| Artikelhuvud | 200×200-ruta, hela kvadraten syns, underkanten ligger på strecket |
+| Skribentsida | 180 px cirkel, `object-fit: cover` vid 50 % 50 %, på en platta i `#EBEBEB` |
+
+Alltså beskärs ingenting vid export. Verktyget exporterar en **kvadratisk PNG på
+800×800** och de tre vyerna — stora förhandsvisningen, artikelhuvudet och
+skribentsidan — är fönster mot samma kvadrat. Drar man i en flyttas alla.
+
+Startläget fyller kvadratens bredd med motivet och ställer det på nederkanten.
+Det läser rätt på båda ställena: helt, stående på artikelns streck, och
+cirkelbeskuret på skribentsidan, där en bottenställd figur fyller cirkeln i
+stället för att sväva i den.
 
 ### Mätt, inte gissat
 
-Layouten är avläst från den riktiga artikeln med Playwright, inte antagen:
+Båda layouterna är avlästa från de riktiga sidorna med Playwright:
 
 | | |
 |---|---|
-| Rubrik | Sueca Hd i **light**, 42/46 px, ingen negativ knipning |
-| Skribentnamn | samma rubrik, som kolonprefix i `#C3C2C1` — **samma grå i båda lägena** |
+| Artikelrubrik | Sueca Hd **light**, 42/46 px, ingen negativ knipning |
+| Skribentnamn i rubriken | kolonprefix i `#C3C2C1` — samma grå i båda lägena |
 | Taggrad | SvD Ester Blenda 700, sektionen i aktionsblått |
-| Ljust läge | botten `#FFFFFF`, rubrik `#1D1D1B`, tagg `#0D4C80`, linje `#F2EFEE` |
-| Mörkt läge | botten `#0B2337`, rubrik `#F7F6F5`, tagg `#42C0F0` |
-| Porträtt | kvadratisk ruta, `overflow: hidden`, bottenlinjerad mot strecket |
+| Ljust läge | `#FFFFFF` / rubrik `#1D1D1B` / tagg `#0D4C80` / linje `#F2EFEE` |
+| Mörkt läge | `#0B2337` / rubrik `#F7F6F5` / tagg `#42C0F0` |
+| Skribentsidans namn | Sueca Hd 700, 30 px, centrerat |
+| Följ-knappen | Ester Blenda 700 på `#42C0F0`, radie 999 px |
 
-Mörkt läge använder alltså `#0B2337` — exakt samma marin som `--blue-700` i
-designsystemet. Och artikeln laddar precis de woff2-filer som ligger i `fonts/`,
-vilket bekräftar att designsystemets typsnitt är produktionstypsnitten.
+Mörkt läge är `#0B2337` — samma marin som `--blue-700`. Sidorna laddar precis de
+woff2-filer som ligger i `fonts/`, vilket bekräftar att designsystemets typsnitt
+är produktionstypsnitten.
 
-Både ljust och mörkt går att växla mellan, liksom desktop och mobil, eftersom
-rubriken bryts olika och porträttet är mindre i den smala spalten.
-
-Startläget fyller ramens bredd med motivet och ställer det på nederkanten, så
-figuren går ut genom strecket i stället för att sväva. Bylinen sparas som PNG
-med genomskinlig bakgrund, beskuren precis som i förhandsvisningen.
-
-Förhandsvisningen är avsiktligt omärkt. Den visar placering och är inte en
-återgivning av någon tidnings sidhuvud.
+Förhandsvisningarna är avsiktligt omärkta. De visar placering och är inte
+återgivningar av någon tidnings sidor.
 
 ## Filformat
 

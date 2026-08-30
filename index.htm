@@ -49,7 +49,7 @@
     <link rel="preconnect" href="https://huggingface.co">
 
     <link rel="stylesheet" href="styles/brand.css?v=2f060107">
-    <link rel="stylesheet" href="styles/app.css?v=3c646ad2">
+    <link rel="stylesheet" href="styles/app.css?v=b931334c">
 </head>
 <body>
 
@@ -146,8 +146,8 @@
             <div class="card__body">
                 <div class="result-head">
                     <div class="result-head__meta">
-                        <h2 class="result-title">Placering i artikelhuvud</h2>
-                        <p class="description">Dra i porträttet för att placera det, rulla för att zooma. Det nedre strecket beskär bilden, precis som i artikeln.</p>
+                        <h2 class="result-title">Placering</h2>
+                        <p class="description">Bilden laddas upp som en kvadrat och används både i artikelhuvudet och på skribentsidan. Dra för att placera, rulla för att zooma — båda vyerna visar samma kvadrat.</p>
                     </div>
                     <div class="result-head__actions">
                         <div class="segmented" role="group" aria-label="Visa som">
@@ -177,11 +177,22 @@
                             <span class="artikel__author" id="previewAuthor">Mållgan Johansson:</span>
                             <span class="artikel__title" id="previewHeadline">Ted Cruz är en fi-fi-finfin kille.</span>
                         </h1>
-                        <div class="artikel__portrait" id="bylineFrame" title="Dra för att placera, rulla för att zooma">
-                            <canvas id="bylineCanvas" role="img" aria-label="Porträtt i artikelhuvudet"></canvas>
+                        <div class="artikel__portrait" id="artikelFrame" title="Dra för att placera, rulla för att zooma">
+                            <canvas id="artikelCanvas" role="img" aria-label="Porträtt i artikelhuvudet"></canvas>
                         </div>
                     </div>
                     <p class="artikel__caption">Var och en har medhavt staket och grill. Foto: Fredrik Sandberg /TT</p>
+                </div>
+
+                <!-- Same square, as the author page renders it: 180px circle,
+                     object-fit cover, on a #EBEBEB plate. -->
+                <div class="forfattare" id="forfattarePreview" data-scheme="light">
+                    <div class="forfattare__plate" id="avatarFrame" title="Dra för att placera, rulla för att zooma">
+                        <canvas id="avatarCanvas" role="img" aria-label="Porträtt på skribentsidan"></canvas>
+                    </div>
+                    <p class="forfattare__name" id="previewName">Mållgan Johansson</p>
+                    <p class="forfattare__follow"><span>+ Följ</span></p>
+                    <p class="forfattare__bio">Skribent på Svenska CP-Tjänst. Skriver om det som ligger fritt och det som inte gör det.</p>
                 </div>
 
                 <div class="control-row">
@@ -201,7 +212,7 @@
                 </div>
 
                 <div class="ground-row">
-                    <span class="description">Sparas som PNG med genomskinlig bakgrund, beskuren som i förhandsvisningen.</span>
+                    <span class="description">Sparas som kvadratisk PNG med genomskinlig bakgrund — samma bild som visas ovan.</span>
                     <div class="ground-row__actions">
                         <button type="button" id="bylineResetBtn" class="btn btn--ghost btn--sm">Återställ vy</button>
                         <button type="button" id="bylineDownloadBtn" class="btn">Spara byline-PNG</button>
@@ -299,6 +310,6 @@
     </script>
 
     <script src="vendor/utif.js?v=e3e76115"></script>
-    <script type="module" src="script.js?v=b71f0643"></script>
+    <script type="module" src="script.js?v=9dbc8a42"></script>
 </body>
 </html>

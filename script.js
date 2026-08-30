@@ -60,6 +60,11 @@ const STORAGE_BUFFERS_NEEDED = 7;
 
 const WASM_ONLY_KEY = 'lf.wasmOnly';
 
+// The uploaded square, in pixels. SvD requests it at w=200 and renders it at
+// 200 in the article header and 180 on the author page, so 800 leaves room for
+// retina without making the file silly.
+const SQUARE = 800;
+
 const ACCEPTED = /\.(jpe?g|png|tiff?|avif)$/i;
 const MAX_PIXELS = 40e6; // ~40 MP, above which decoding is the bottleneck, not the model
 
@@ -83,10 +88,18 @@ class LiggaFritt {
         this.factDevice = document.getElementById('factDevice');
         this.deviceNote = document.getElementById('deviceNote');
         this.bylineCard = document.getElementById('bylineCard');
-        this.bylineFrame = document.getElementById('bylineFrame');
-        this.bylineCanvas = document.getElementById('bylineCanvas');
-        this.bylineCtx = this.bylineCanvas.getContext('2d');
         this.bylineZoom = document.getElementById('bylineZoom');
+        // The upload itself: one square, drawn once per change and then blitted
+        // into every preview. SvD serves the same file to the article header and
+        // the author page, so there is one image to frame, not two.
+        this.square = document.createElement('canvas');
+        this.square.width = SQUARE;
+        this.square.height = SQUARE;
+        this.squareCtx = this.square.getContext('2d');
+        this.views = [
+            { frame: document.getElementById('artikelFrame'), canvas: document.getElementById('artikelCanvas') },
+            { frame: document.getElementById('avatarFrame'), canvas: document.getElementById('avatarCanvas') },
+        ].filter((v) => v.frame && v.canvas);
 
         this.source = null;   // { bitmap, width, height, name }
         this.cutout = null;   // ImageData with the matte applied
@@ -180,12 +193,10 @@ class LiggaFritt {
 
         this.bindByline();
 
-        // The frame's box changes with the window, so keep the backing store
-        // and the framing in step with it.
+        // Preview boxes change size with the window; the square does not, but
+        // the backing stores blitted into them do.
         window.addEventListener('resize', () => {
-            if (!this.cutout) return;
-            this.sizeBylineCanvas();
-            this.paintFraming();
+            if (this.cutout) this.paintFraming();
         });
 
         this.downloadBtn.addEventListener('click', () => this.download());
@@ -426,11 +437,18 @@ class LiggaFritt {
        ------------------------------------------------------------------- */
 
     bindByline() {
-        const frame = this.bylineFrame;
-        if (!frame) return;
+        if (!this.views.length) return;
 
-        // Inside the byline frame one frame-pixel is one frame-pixel.
-        this.bindFraming(frame, () => 1, (e) => this.anchorInFrame(e));
+        // Every preview is a window onto the same square, so each one drags it;
+        // they differ only in how many square-pixels one on-screen pixel is.
+        this.views.forEach((v) => {
+            const ratio = () => SQUARE / v.frame.getBoundingClientRect().width;
+            this.bindFraming(v.frame, ratio, (e) => {
+                const r = v.frame.getBoundingClientRect();
+                const k = ratio();
+                return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+            });
+        });
 
         this.bylineZoom.addEventListener('input', (e) => {
             this.setBylineScale(parseFloat(e.target.value));
@@ -456,7 +474,9 @@ class LiggaFritt {
             const name = author.value.trim();
             // The name is a colon prefix inside the headline, so the colon comes
             // from us — typing one should not produce two.
-            document.getElementById('previewAuthor').textContent = name ? name.replace(/:\s*$/, '') + ':' : '';
+            const clean = name.replace(/:\s*$/, '');
+            document.getElementById('previewAuthor').textContent = clean ? clean + ':' : '';
+            document.getElementById('previewName').textContent = clean;
             document.getElementById('previewHeadline').textContent = headline.value;
         };
         author.addEventListener('input', syncText);
@@ -514,13 +534,6 @@ class LiggaFritt {
         return k / (fit.scale * css);
     }
 
-    /** A pointer event over the byline frame, in frame pixels. */
-    anchorInFrame(e) {
-        const r = this.bylineFrame.getBoundingClientRect();
-        const dpr = this.bylineCanvas.width / r.width;
-        return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr };
-    }
-
     /** A pointer event over the big preview, mapped into frame pixels. */
     anchorInPreview(e) {
         const r = this.canvas.getBoundingClientRect();
@@ -550,6 +563,7 @@ class LiggaFritt {
 
     setScheme(which) {
         document.getElementById('artikelPreview').dataset.scheme = which;
+        document.getElementById('forfattarePreview').dataset.scheme = which;
         document.querySelectorAll('[data-scheme]').forEach((btn) => {
             if (btn.tagName !== 'BUTTON') return;
             const active = btn.dataset.scheme === which;
@@ -566,26 +580,7 @@ class LiggaFritt {
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-pressed', String(active));
         });
-        // The frame's aspect changes between the two, so re-fit the backing store.
-        this.sizeBylineCanvas();
         this.paintFraming();
-    }
-
-    /** Match the backing store to the frame's CSS box, at 4x for a crisp export. */
-    sizeBylineCanvas() {
-        const frame = this.bylineFrame;
-        if (!frame) return;
-        const scale = 4;
-        const w = Math.round(frame.clientWidth * scale);
-        const h = Math.round(frame.clientHeight * scale);
-        if (this.bylineCanvas.width === w && this.bylineCanvas.height === h) return;
-        const prev = this.bylineCanvas.width || w;
-        this.bylineCanvas.width = w;
-        this.bylineCanvas.height = h;
-        // Keep the framing put when the box changes size.
-        const k = w / prev;
-        this.byline.offsetX *= k;
-        this.byline.offsetY *= k;
     }
 
     setBylineScale(scale, anchor = null) {
@@ -596,7 +591,7 @@ class LiggaFritt {
         // Zoom about a point so what is under it stays put — the cursor when
         // scrolling, the middle of the frame when using the slider. Scaling
         // about the origin instead just shoves the subject out of view.
-        const at = anchor || { x: this.bylineCanvas.width / 2, y: this.bylineCanvas.height / 2 };
+        const at = anchor || { x: SQUARE / 2, y: SQUARE / 2 };
         const k = next / prev;
         this.byline.offsetX = at.x - (at.x - this.byline.offsetX) * k;
         this.byline.offsetY = at.y - (at.y - this.byline.offsetY) * k;
@@ -605,14 +600,6 @@ class LiggaFritt {
         this.paintFraming();
     }
 
-    zoomBylineAt(factor, event) {
-        const r = this.bylineFrame.getBoundingClientRect();
-        const dpr = this.bylineCanvas.width / r.width;
-        this.setBylineScale(this.byline.scale * factor, {
-            x: (event.clientX - r.left) * dpr,
-            y: (event.clientY - r.top) * dpr,
-        });
-    }
 
     /** The tight bounding box of everything the matte kept. */
     subjectBounds() {
@@ -633,42 +620,50 @@ class LiggaFritt {
     }
 
     /**
-     * Default framing: fill the frame's width with the subject and sit it on the
-     * bottom edge, so the figure exits through the rule the way the page expects
-     * rather than floating in the middle of the block.
+     * Default framing: fill the square's width with the subject and sit it on
+     * the bottom edge. That reads correctly in both places the square is used —
+     * whole, standing on the article's rule, and circle-cropped on the author
+     * page, where a bottom-anchored figure fills the circle rather than floating
+     * in it.
      */
     fitByline() {
         if (!this.cutout) return;
-        this.sizeBylineCanvas();
-
-        const frame = { w: this.bylineCanvas.width, h: this.bylineCanvas.height };
         const b = this.bounds || (this.bounds = this.subjectBounds());
+        const base = SQUARE / b.width;
 
-        const base = frame.w / b.width;
         this.byline.scale = 1;
         this.byline.base = base;
-        this.byline.offsetX = -b.x * base + (frame.w - b.width * base) / 2;
-        this.byline.offsetY = frame.h - (b.y + b.height) * base;
+        this.byline.offsetX = -b.x * base + (SQUARE - b.width * base) / 2;
+        this.byline.offsetY = SQUARE - (b.y + b.height) * base;
 
         this.bylineZoom.value = 1;
         this.paintFraming();
     }
 
+    /** Draw the square once, then blit it into each preview. */
     paintByline() {
-        if (!this.cutout || !this.bylineCtx) return;
-        const ctx = this.bylineCtx;
-        const { width: w, height: h } = this.bylineCanvas;
-        ctx.clearRect(0, 0, w, h);
+        if (!this.cutout || !this.squareCtx) return;
+        const ctx = this.squareCtx;
+        ctx.clearRect(0, 0, SQUARE, SQUARE);
 
         const k = (this.byline.base || 1) * this.byline.scale;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(this.cutoutBitmap, this.byline.offsetX, this.byline.offsetY,
             this.cutout.width * k, this.cutout.height * k);
+
+        this.views.forEach(({ frame, canvas }) => {
+            const size = Math.round(frame.getBoundingClientRect().width * 2) || 2;
+            if (canvas.width !== size) { canvas.width = size; canvas.height = size; }
+            const c = canvas.getContext('2d');
+            c.clearRect(0, 0, size, size);
+            c.imageSmoothingQuality = 'high';
+            c.drawImage(this.square, 0, 0, size, size);
+        });
     }
 
     async downloadByline() {
         if (!this.cutout) return;
-        const blob = await new Promise((r) => this.bylineCanvas.toBlob(r, 'image/png'));
+        const blob = await new Promise((r) => this.square.toBlob(r, 'image/png'));
         if (!blob) {
             this.fail('Kunde inte skapa PNG', 'Webbläsaren nekade exporten.');
             return;
@@ -738,15 +733,15 @@ class LiggaFritt {
      * just a bigger picture but the same framing decision at working size.
      */
     drawCropOutline() {
-        if (!this.byline.base || this.bylineCanvas.width === 0) return;
+        if (!this.byline.base) return;
         const ctx = this.ctx;
         const k = this.byline.base * this.byline.scale;
 
         // The frame, expressed in the cut-out's own pixels.
         const x = -this.byline.offsetX / k;
         const y = -this.byline.offsetY / k;
-        const w = this.bylineCanvas.width / k;
-        const h = this.bylineCanvas.height / k;
+        const w = SQUARE / k;
+        const h = SQUARE / k;
 
         const line = Math.max(2, this.canvas.width / 260);
         ctx.save();

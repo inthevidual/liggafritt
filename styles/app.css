@@ -419,12 +419,15 @@
 
 /* Bottom-anchored and clipped, so the figure exits through the rule rather
    than floating above it. */
+/* Square, and flush with the rule: the article shows the whole uploaded square
+   in a 200x200 box whose bottom edge is the rule. Nothing is cropped there —
+   the framing that matters is inside the square itself. */
 .artikel__portrait {
   position: absolute;
   right: 28px;
   bottom: 0;
-  width: 168px;
-  height: 190px;
+  width: 176px;
+  height: 176px;
   cursor: grab;
   touch-action: none;
   overflow: hidden;
@@ -448,13 +451,13 @@
 .artikel[data-viewport='mobile'] .artikel__block { padding: 16px 16px 0; min-height: 215px; }
 .artikel[data-viewport='mobile'] .artikel__h1 { font-size: 26px; max-width: 56%; }
 .artikel[data-viewport='mobile'] .artikel__tags { font-size: 13px; margin-bottom: 16px; }
-.artikel[data-viewport='mobile'] .artikel__portrait { right: 16px; width: 128px; height: 146px; }
+.artikel[data-viewport='mobile'] .artikel__portrait { right: 16px; width: 132px; height: 132px; }
 .artikel[data-viewport='mobile'] .artikel__caption { padding: 10px 16px 14px; }
 
 @media (max-width: 599px) {
   .artikel__block { padding: 16px 16px 0; }
   .artikel__h1 { font-size: 26px; max-width: 56%; }
-  .artikel__portrait { right: 16px; width: 128px; height: 146px; }
+  .artikel__portrait { right: 16px; width: 132px; height: 132px; }
   .artikel__caption { padding: 10px 16px 14px; }
 }
 
@@ -473,4 +476,81 @@
 
 @media (min-width: 768px) {
   .byline-fields { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Author-page preview ──────────────────────────────────────────────────────
+   The same square as the article header, rendered the way the author page does
+   it: a 180px circle, object-fit cover at 50% 50%, on a #EBEBEB plate. Measured
+   off the live page, as is the name — Sueca Hd 700 at 30px, centred — and the
+   follow pill in Ester Blenda 700 on #42C0F0.
+   ------------------------------------------------------------------------- */
+
+.forfattare {
+  margin-top: 16px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
+  padding: 26px 24px 22px;
+  text-align: center;
+  max-width: 570px;
+}
+
+.forfattare[data-scheme='light'] {
+  --f-bg: #FFFFFF;
+  --f-text: #1D1D1B;
+  --f-plate: #EBEBEB;
+  --f-bio: #2E2E2E;
+}
+
+.forfattare[data-scheme='dark'] {
+  --f-bg: #0B2337;
+  --f-text: #F7F6F5;
+  --f-plate: #12314B;
+  --f-bio: #B9C7D4;
+}
+
+.forfattare { background: var(--f-bg); }
+
+.forfattare__plate {
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--f-plate);
+  cursor: grab;
+  touch-action: none;
+}
+
+.forfattare__plate:active { cursor: grabbing; }
+.forfattare__plate canvas { display: block; width: 100%; height: 100%; }
+
+.forfattare__name {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.15;
+  color: var(--f-text);
+}
+
+.forfattare__follow { margin: 0 0 14px; }
+
+.forfattare__follow span {
+  display: inline-block;
+  padding: 7px 20px;
+  border-radius: 999px;
+  background: #42C0F0;
+  color: #1D1D1B;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.forfattare__bio {
+  margin: 0 auto;
+  max-width: 42ch;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--f-bio);
 }
