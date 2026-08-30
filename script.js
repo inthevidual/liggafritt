@@ -41,18 +41,22 @@ const MODEL = {
 };
 
 /**
- * BiRefNet's compute shader binds 11 storage buffers. WebGPU devices advertise
- * a ceiling for that, and Chrome on Apple Silicon reports 10 — one short — so
- * the run aborts inside ONNX Runtime with
+ * ONNX Runtime's WebGPU backend binds about one storage buffer per runtime
+ * input plus one per output, and aborts when a single kernel exceeds the
+ * device's maxStorageBuffersPerShaderStage:
  *
  *   numbers_storage_buffers_ <= limits_.maxStorageBuffersPerShaderStage
  *   Too many storage buffers in shader. Current: 11, Max is 10
  *
- * The adapter publishes that number, so it is checkable before anything is
- * downloaded or run. Machines that cannot carry the shader quietly use WASM
- * instead of failing halfway through.
+ * Wide Concat is the usual cause — every input is its own buffer. Measured with
+ * tools/onnx-buffers.py, this model's worst kernel binds 7; the 1024 export has
+ * a Concat with 1024 inputs, which is why it cannot run here at all.
+ *
+ * 7 is under the 8 the WebGPU spec guarantees, so in practice every device
+ * qualifies. The check stays anyway: it is cheap, it is read off the adapter
+ * before anything is downloaded, and it will catch the day this number moves.
  */
-const STORAGE_BUFFERS_NEEDED = 11;
+const STORAGE_BUFFERS_NEEDED = 7;
 
 const WASM_ONLY_KEY = 'lf.wasmOnly';
 

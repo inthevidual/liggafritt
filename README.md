@@ -49,23 +49,39 @@ ett verktyg man öppnar en gång.
 
 ### Gränsen som avgör WebGPU
 
-BiRefNets shader binder **11 lagringsbuffertar**. WebGPU-enheter annonserar ett
-tak för det, och Chrome på Apple Silicon rapporterar **10** — en för lite. Då
-avbryts körningen inne i ONNX Runtime:
+ONNX Runtimes WebGPU-backend binder ungefär en lagringsbuffert per körtidsindata
+plus en per utdata, och avbryter när en enskild kernel överskrider enhetens
+`maxStorageBuffersPerShaderStage`:
 
 ```
 numbers_storage_buffers_ <= limits_.maxStorageBuffersPerShaderStage
 Too many storage buffers in shader. Current: 11, Max is 10
 ```
 
-Adaptern publicerar den siffran, så den går att läsa av *innan* något laddas ner
-eller körs. Verktyget kollar `maxStorageBuffersPerShaderStage` och väljer WASM
-när talet är för lågt, i stället för att haverera halvvägs. Sidan skriver ut
-vilket som gäller och varför.
+Bred `Concat` är den vanliga orsaken — varje indata är sin egen buffert. Kör
+`tools/onnx-buffers.py` för att mäta:
+
+| Modell | Värsta kernel |
+|---|---|
+| `studioludens/birefnet-lite-512` | **7** buffertar |
+| `onnx-community/BiRefNet_lite` (1024) | **1025** — en `Concat` med 1024 indata |
+
+Det är alltså 1024-exporten som havererar, inte arkitekturen. Den som körs här
+behöver 7, under de 8 som WebGPU-specifikationen garanterar, så i praktiken
+klarar alla enheter den. Kontrollen finns ändå kvar: den är gratis, den läses av
+adaptern innan något laddas ner, och den fångar dagen siffran rör på sig.
 
 Kontrollen täcker bara den gräns vi känner till — en drivrutin kan fela på sätt
 som inget annonserar. Därför faller ett WebGPU-fel ändå tillbaka på WASM, minns
 det till nästa besök och säger till. WASM är golvet.
+
+### Om 1024 någon gång ska köras
+
+Det skulle kräva grafkirurgi: dela upp de breda `Concat`-noderna i kedjor av
+smala. Numeriskt identiskt, en engångsåtgärd på exporten. Men modellen får
+dessutom slut på minne på WASM, så den skulle bara fungera med WebGPU — och
+`/decoder/Concat` med 1024 indata är en större sak än den låter. Inte gjort,
+och inte nödvändigt för det här verktyget.
 
 ## Filformat
 
