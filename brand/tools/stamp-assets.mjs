@@ -25,17 +25,33 @@ let html = fs.readFileSync(page, 'utf8');
 const stamped = [];
 let missing = 0;
 
-// Matches href/src="some/local/path.ext?v=token"
-html = html.replace(/(href|src)="([^":]+?\.(?:css|js|svg|png|webp|jpg))\?v=[^"]*"/g, (all, attr, rel) => {
+const stamp = (rel) => {
   const file = path.join(root, rel);
   if (!fs.existsSync(file)) {
     console.warn(`  ! ${rel} does not exist — left as is`);
     missing++;
-    return all;
+    return null;
   }
   const h = hash(file);
   stamped.push(`${rel} -> ${h}`);
-  return `${attr}="${rel}?v=${h}"`;
+  return h;
+};
+
+const EXT = '(?:css|js|svg|png|webp|jpg)';
+
+// href/src="some/local/path.ext?v=token"
+html = html.replace(new RegExp(`(href|src)="([^":]+?\\.${EXT})\\?v=[^"]*"`, 'g'), (all, attr, rel) => {
+  const h = stamp(rel);
+  return h ? `${attr}="${rel}?v=${h}"` : all;
+});
+
+// content="https://host/path.ext?v=token" — the og:image and twitter:image.
+// These need stamping every bit as much as the rest: social scrapers and the
+// CDN both key on the URL, so an image that changes under an unchanged URL
+// keeps serving the old card until some cache decides otherwise.
+html = html.replace(new RegExp(`content="(https?://[^"]+?/)([^"?]+?\\.${EXT})\\?v=[^"]*"`, 'g'), (all, origin, rel) => {
+  const h = stamp(rel);
+  return h ? `content="${origin}${rel}?v=${h}"` : all;
 });
 
 fs.writeFileSync(page, html);
