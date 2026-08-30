@@ -151,14 +151,22 @@ pressas, medan en 160px webp täcker 3× DPR vid sidhuvudets 45 px. Vid 16–48 
 vinner en favicon ingenting på att vara vektor. `mark.svg` är den redigerbara
 mastern.
 
-Ingen beskärning görs, till skillnad från Banfinatorns märke: den här
-originalfilen ramar redan in sig själv. Uppmätt spänner halotonens gloria
-x 102..1194, y 14..1080 i en kvadrat på 1254, alltså fri från alla kanter, och
-bara axlarna går ut genom underkanten — vilket är rätt för en byst.
+Märket är **beskuret till ansiktet**. Uppmätt ur originalet — figuren renderad
+utan halvtonen, silhuettens bredd läst rad för rad — sitter hjässan på y 92,
+skäggets bredaste punkt kring y 420, halsen som smalast vid y 620 och axlarna
+börjar flälla ut vid y 668. Huvudet upptar alltså y 92..620 och x 456..902, och
+beskärningen `369, 52, 620×620` ramar in det med lite luft över och en aning
+krage under.
 
-En sak att avgöra: märket visar hela bysten, så ansiktet blir omkring 15 px i
-sidhuvudet. Banfinatorn beskärs till huvudet just därför. Säg till om samma
-behandling ska göras här — det är en rad i `build-mark.mjs`.
+Det beskär halon, vilket en helbild inte hade gjort. Det är avvägningen: vid
+40 px i sidhuvudet blir ansiktet omkring femton pixlar högt i en helbild, och en
+bestämd ansiktsbeskärning läses som avsiktlig där en nästan hel halo läses som
+ett misstag.
+
+OG-bilden använder däremot **hela figuren**, förankrad i nedre högra hörnet och
+något överstor så att armar och överkropp går ut genom kortets egna kanter. Låg
+den fritt med luft under såg den nedre beskärningen ut som ett fel i stället för
+som ett utfall.
 
 ## Cache busting
 

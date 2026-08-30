@@ -9,10 +9,17 @@
 //          brand/mark.webp               what the header shows
 //          brand/favicon-{16,32,48}.png, brand/apple-touch-icon.png
 //
-// No crop step, unlike the Banfinator's mark: this artwork already frames
-// itself. Measured from the export, the halftone halo spans x 102..1194,
-// y 14..1080 inside a 1254 square, so it clears every edge, and only the
-// shoulders leave through the bottom — which is right for a bust.
+// Square crop around the face, in source viewBox units. Measured, not eyeballed:
+// rendering the figure with the halftone stripped and reading the silhouette
+// width per row puts the crown at y=92, the widest point of the beard at y~420,
+// the neck at its narrowest at y~620, and the shoulders flaring from y~668. So
+// the head occupies y 92..620, x 456..902 at its widest, and the crop below
+// frames it with a little air above and a collar's worth below.
+//
+// This does cut the halo, which a full-bust framing would not. That is the
+// trade: at 40px in the header a whole bust leaves the face about fifteen
+// pixels tall, and a decisive face crop reads as intended where a nearly
+// contained halo reads as an accident.
 //
 // The mark is served as raster. It is a traced portrait with ~500 paths, so the
 // vector stays large however hard it is squeezed, while a 160px webp covering
@@ -117,13 +124,48 @@ function classifyFills(svg) {
 
 const MERGE_THRESHOLD = 2;
 
+// x, y, side in source viewBox units.
+const CROP = { x: 369, y: 52, w: 620 };
+
 const kb = (f) => `${(fs.statSync(f).size / 1024).toFixed(1)} KB`;
+
+/**
+ * Reduce to the crop box: rewrite the viewBox and delete every element whose
+ * bounding box falls wholly outside it. Cropping by viewBox alone still ships
+ * every path of the body, just clipped.
+ */
+function crop(svg, { x, y, w }) {
+  let n = 0;
+  const tagged = svg.replace(/<(path|circle|polygon|rect|ellipse)\b/g, (m, tag) => `<${tag} id="e${n++}"`);
+  fs.writeFileSync(t('ids.svg'), tagged);
+
+  const boxes = {};
+  for (const line of execFileSync('inkscape', ['--query-all', t('ids.svg')], { maxBuffer: 1 << 28 })
+    .toString().split('\n')) {
+    const p = line.split(',');
+    if (p.length === 5 && /^e\d+$/.test(p[0])) boxes[p[0]] = p.slice(1).map(Number);
+  }
+
+  let dropped = 0;
+  const out = tagged.replace(/<(?:path|circle|polygon|rect|ellipse)\b[^>]*id="(e\d+)"[^>]*\/>/g, (m, id) => {
+    const b = boxes[id];
+    if (!b) return m.replace(/ id="e\d+"/, '');
+    const [bx, by, bw, bh] = b;
+    if (bx + bw < x || bx > x + w || by + bh < y || by > y + w) { dropped++; return ''; }
+    return m.replace(/ id="e\d+"/, '');
+  });
+  console.log(`  dropped ${dropped} off-canvas elements`);
+  return out.replace(/viewBox="[^"]*"/, `viewBox="${x} ${y} ${w} ${w}"`);
+}
 
 // ── vector master ──────────────────────────────────────────────────────────
 console.log('mark…');
+// Cull before merging: mergePaths fuses shapes into paths spanning the whole
+// figure, and one of those clipping the crop drags everything in with it.
 svgo(src, t('p1.svg'), PASS1);
 fs.writeFileSync(t('cls.svg'), classifyFills(fs.readFileSync(t('p1.svg'), 'utf8')));
-svgo(t('cls.svg'), t('mark.svg'), PASS2);
+fs.writeFileSync(t('crop.svg'), crop(fs.readFileSync(t('cls.svg'), 'utf8'), CROP));
+svgo(t('crop.svg'), t('mark.svg'), PASS2);
 fs.writeFileSync(out('mark.svg'),
   fs.readFileSync(t('mark.svg'), 'utf8').replace(/(<svg[^>]*>)/, '$1<title>Ligga fritt</title>'));
 console.log(`  brand/mark.svg ${kb(out('mark.svg'))} (source, not served)`);
